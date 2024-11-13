@@ -18,7 +18,7 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
       - name: Build
-        run: make build
+        run: make build-ci
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
