@@ -35,6 +35,8 @@ jobs:
           ADMIN_RATELIMIT_SECONDS: "60"
         ports:
           - 8000:8000
+        volumes:
+          - /tmp/vaultwarden:/data
         options: --health-cmd="curl --fail http://localhost:8000/alive" --health-interval=10s --health-timeout=5s --health-retries=3
     strategy:
       fail-fast: false
