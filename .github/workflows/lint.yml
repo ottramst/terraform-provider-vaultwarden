@@ -1,0 +1,33 @@
+name: Lint
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+  push:
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+        description: 'The version of Go to use for the action.'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ inputs.go-version }}
+      - name: Install golangic-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+      - name: Run linter
+        run: make lint

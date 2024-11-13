@@ -11,12 +11,9 @@ import (
 	"net/http/cookiejar"
 	"net/mail"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 )
-
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
 // Client represents a Vaultwarden API client
 type Client struct {

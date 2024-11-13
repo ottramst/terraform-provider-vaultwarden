@@ -1,22 +1,19 @@
-# Terraform Provider testing workflow.
-name: Tests
+name: Test
 
-# This GitHub action runs your tests for each pull request and push.
-# Optionally, you can turn it on using a schedule for regular testing.
 on:
   pull_request:
     paths-ignore:
       - 'README.md'
+      - 'CHANGELOG.md'
   push:
     paths-ignore:
       - 'README.md'
+      - 'CHANGELOG.md'
 
-# Testing only needs permissions to read the repository contents.
 permissions:
   contents: read
 
 jobs:
-  # Ensure project builds before running testing matrix
   build:
     name: Build
     runs-on: ubuntu-latest
