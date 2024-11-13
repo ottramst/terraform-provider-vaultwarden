@@ -35,3 +35,4 @@ website/vendor
 *.winfile eol=crlf
 
 testing/
+terraform-provider-vaultwarden

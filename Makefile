@@ -1,5 +1,8 @@
 .DEFAULT_GOAL = fmt lint install generate
 
+NAME = vaultwarden
+BINARY = terraform-provider-${NAME}
+
 ACCTEST_PARALLELISM ?= 10
 ACCTEST_TIMEOUT = 120m
 ACCTEST_COUNT = 1
@@ -21,6 +24,10 @@ GOVERSION ?= $(shell grep -e '^go' go.mod | cut -f 2 -d ' ')
 .PHONY: build
 build:
 	go build -v ./...
+
+.PHONY: build-ci
+build-ci:
+	go build -o $(BINARY)
 
 .PHONY: install
 install: build

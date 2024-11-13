@@ -1,14 +1,12 @@
 name: Test
 
 on:
-  pull_request:
-    paths-ignore:
-      - 'README.md'
-      - 'CHANGELOG.md'
-  push:
-    paths-ignore:
-      - 'README.md'
-      - 'CHANGELOG.md'
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+        description: 'The version of Go to use for the action.'
 
 permissions:
   contents: read
