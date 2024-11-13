@@ -26,7 +26,7 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
       - name: Install golangic-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
       - name: Run linter
