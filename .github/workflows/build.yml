@@ -1,0 +1,26 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+        description: 'The version of Go to use for the action.'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+      - name: Build
+        run: make build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: binary
+          path: terraform-provider-vaultwarden
