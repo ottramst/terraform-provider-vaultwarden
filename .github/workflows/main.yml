@@ -1,14 +1,6 @@
 name: CI/CD
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
-    paths-ignore:
-      - 'README.md'
-      - 'CHANGELOG.md'
   pull_request:
     branches:
       - main
