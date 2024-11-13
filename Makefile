@@ -21,6 +21,9 @@ SOURCE_LOCATION ?= $(shell pwd)
 
 GOVERSION ?= $(shell grep -e '^go' go.mod | cut -f 2 -d ' ')
 
+vendor:
+	@ go mod download
+
 .PHONY: build
 build:
 	go build -v ./...

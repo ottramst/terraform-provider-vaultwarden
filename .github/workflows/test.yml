@@ -12,69 +12,64 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-      - run: go mod download
-      - run: go build -v .
-      - name: Run linters
-        uses: golangci/golangci-lint-action@02ee5067dca7bfdce7a74e00ec4acac190dead4e # v6.1.1
-        with:
-          version: latest
-
-  generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-      # We need the latest version of Terraform for our documentation generation to use
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-        with:
-          terraform_wrapper: false
-      - run: make generate
-      - name: git diff
-        run: |
-          git diff --compact-summary --exit-code || \
-            (echo; echo "Unexpected difference in directories after code generation. Run 'make generate' command and commit."; exit 1)
-
-  # Run acceptance tests in a matrix with Terraform CLI versions
   test:
     name: Terraform Provider Acceptance Tests
-    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    env:
+      VAULTWARDEN_ADMIN_TOKEN: admin_token
+    services:
+      mailhog:
+        image: mailhog/mailhog
+        ports:
+          - 1025:1025
+      vaultwarden:
+        image: vaultwarden/server:${{ matrix.vaultwarden_version }}-alpine
+        env:
+          ROCKET_PORT: "8000"
+          ADMIN_TOKEN: ${{ env.VAULTWARDEN_ADMIN_TOKEN }}
+          SMTP_HOST: mailhog
+          SMTP_PORT: "1025"
+          SMTP_SECURITY: off
+          SMTP_FROM: vaultwarden@example.com
+          ADMIN_RATELIMIT_MAX_BURST: "10"
+          ADMIN_RATELIMIT_SECONDS: "60"
+        ports:
+          - 8000:8000
+        options: --health-cmd="curl --fail http://localhost:8000/alive" --health-interval=10s --health-timeout=5s --health-retries=3
     strategy:
       fail-fast: false
       matrix:
-        # list whatever Terraform versions here you would like to support
-        terraform:
+        terraform_version:
           - '1.0.*'
           - '1.1.*'
           - '1.2.*'
           - '1.3.*'
           - '1.4.*'
+          - '1.5.*'
+          - '1.6.*'
+          - '1.7.*'
+          - '1.8.*'
+          - '1.9.*'
+        vaultwarden_version:
+          - 1.32.4
+          - 1.31.0
+          - 1.30.5
+          - 1.29.2
+          - 1.28.1
+          - 1.27.0
+          - 1.26.0
+          - 1.25.2
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
-          cache: true
+          go-version: ${{ inputs.go-version }}
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: ${{ matrix.terraform }}
           terraform_wrapper: false
-      - run: go mod download
-      - env:
-          TF_ACC: "1"
-        run: go test -v -cover ./internal/provider/
+          terraform_version: ${{ matrix.terraform_version }}
+      - name: Get dependencies
+        run: make vendor
+      - name: Terraform Acceptance Tests
         timeout-minutes: 10
+        run: make testacc
