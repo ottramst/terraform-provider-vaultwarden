@@ -200,7 +200,9 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 }
 
 func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewOrganizationDataSource,
+	}
 }
 
 func (p *VaultwardenProvider) Functions(ctx context.Context) []func() function.Function {
