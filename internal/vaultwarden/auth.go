@@ -260,14 +260,23 @@ func (c *Client) ensureValidAdminAuth(ctx context.Context) error {
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	// Configure client to not follow redirects. This happens for some versions of Vaultwarden
+	// See: https://github.com/dani-garcia/vaultwarden/issues/2444
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
 	// Send request
-	resp, err := c.httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send admin auth request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	// Accept both 200 OK and 303 See Other as successful responses
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusSeeOther {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("admin auth failed: %s", string(body))
 	}
