@@ -25,8 +25,10 @@ jobs:
         env:
           ROCKET_PORT: "8000"
           ADMIN_TOKEN: ${{ env.VAULTWARDEN_ADMIN_TOKEN }}
-          ADMIN_RATELIMIT_MAX_BURST: "10"
-          ADMIN_RATELIMIT_SECONDS: "60"
+          ADMIN_RATELIMIT_MAX_BURST: "1000"
+          ADMIN_RATELIMIT_SECONDS: "10"
+          LOGIN_RATELIMIT_MAX_BURST: "1000"
+          LOGIN_RATELIMIT_SECONDS: "10"
         ports:
           - 8000:8000
         volumes:

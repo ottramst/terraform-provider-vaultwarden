@@ -74,7 +74,6 @@ docker-vaultwarden: docker-network
 	@ docker rm -f $(VAULTWARDEN_DOCKER_NAME) 2> /dev/null || true
 	@ docker run -d \
     	-p 8000:8000 \
-    	-e I_REALLY_WANT_VOLATILE_STORAGE=true \
     	-e ROCKET_PORT=8000 \
     	-e ADMIN_TOKEN=$(VAULTWARDEN_ADMIN_TOKEN) \
     	-e ADMIN_RATELIMIT_MAX_BURST=100 \

@@ -17,7 +17,7 @@ func HMACSum(value, key []byte, algo func() hash.Hash) []byte {
 }
 
 func HKDFExpand(value, key []byte, algo func() hash.Hash, length int) []byte {
-	encKey := hkdf.Expand(sha256.New, value, []byte(key))
+	encKey := hkdf.Expand(sha256.New, value, key)
 	newEncKey := make([]byte, length)
 	_, err := encKey.Read(newEncKey)
 	if err != nil {
