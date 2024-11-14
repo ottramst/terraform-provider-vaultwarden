@@ -14,7 +14,7 @@ func RSAEncrypt(data []byte, publicKey *rsa.PublicKey) (string, error) {
 		sha1.New(),
 		rand.Reader,
 		publicKey,
-		[]byte(data),
+		data,
 		nil)
 	if err != nil {
 		return "", fmt.Errorf("error encrypting data using : %w", err)

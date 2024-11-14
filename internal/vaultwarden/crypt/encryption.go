@@ -88,7 +88,13 @@ func DecryptPrivateKey(encryptedPrivateKeyStr string, encryptionKey symmetrickey
 	if err != nil {
 		return nil, fmt.Errorf("error parse private key: %w", err)
 	}
-	return p.(*rsa.PrivateKey), nil
+
+	privateKey, ok := p.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert to rsa.PrivateKey")
+	}
+
+	return privateKey, nil
 }
 
 func Encrypt(plainValue []byte, key symmetrickey.Key) (*encryptedstring.EncryptedString, error) {
@@ -113,7 +119,12 @@ func Encrypt(plainValue []byte, key symmetrickey.Key) (*encryptedstring.Encrypte
 		return nil, fmt.Errorf("error to aes256encoding data: %w", err)
 	}
 
-	hmac := helpers.HMACSum(append(randomIV, data...), key.MacKey, sha256.New)
+	// Create a new slice with zero length but enough capacity
+	iv := make([]byte, 0, 16+len(data))
+	iv = append(iv, randomIV...)
+	iv = append(iv, data...)
+
+	hmac := helpers.HMACSum(iv, key.MacKey, sha256.New)
 
 	res := encryptedstring.New(randomIV, data, hmac, key)
 

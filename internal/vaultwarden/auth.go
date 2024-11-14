@@ -38,26 +38,6 @@ func (c *Client) requiresAuth(path string) AuthMethod {
 	return AuthMethodUser
 }
 
-// validateAuth checks if the required authentication method is available
-func (c *Client) validateAuth(path string) error {
-	required := c.requiresAuth(path)
-
-	switch required {
-	case AuthMethodAdmin:
-		if !c.hasAdminAuth() {
-			return fmt.Errorf("admin token required for %s", path)
-		}
-	case AuthMethodUser:
-		if !c.hasUserAuth() {
-			return fmt.Errorf("user credentials required for %s", path)
-		}
-	default:
-		return fmt.Errorf("unknown auth method required for %s", path)
-	}
-
-	return nil
-}
-
 // PreloginRequest represents the request to the prelogin endpoint
 type PreloginRequest struct {
 	Email string `json:"email"`
