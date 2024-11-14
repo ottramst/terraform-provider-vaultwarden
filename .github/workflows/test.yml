@@ -18,7 +18,7 @@ jobs:
     env:
       VAULTWARDEN_ADMIN_TOKEN: admin_token
       VAULTWARDEN_EMAIL: test@example.com
-      VAULTWARDEN_PASSWORD: Test1234567!
+      VAULTWARDEN_MASTER_PASSWORD: test-password-123!
     services:
       vaultwarden:
         image: vaultwarden/server:${{ matrix.vaultwarden_version }}-alpine
@@ -61,5 +61,5 @@ jobs:
       - name: Terraform Acceptance Tests
         timeout-minutes: 10
         env:
-          VAULTWARDEN_ENDPOINT: http://localhost:8000
+          VW_TEST_URL: http://localhost:8000
         run: make testacc

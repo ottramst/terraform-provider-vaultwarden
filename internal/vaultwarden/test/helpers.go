@@ -7,6 +7,7 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/crypt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/keybuilder"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -15,7 +16,6 @@ import (
 const (
 	TestPassword   = "test-password-123!"
 	TestEmail      = "test@example.com"
-	TestBaseURL    = "http://tf-vaultwarden:8000"
 	TestAdminToken = "admin_token"
 )
 
@@ -24,7 +24,18 @@ var (
 	testClientOnce  sync.Once
 	testClientError error
 	hashedPassword  string
+	TestBaseURL     = GetTestBaseURL()
 )
+
+// GetTestBaseURL returns the base URL for the Vaultwarden instance
+// It can be configured via the VW_TEST_URL environment variable
+func GetTestBaseURL() string {
+	if url := os.Getenv("VW_TEST_URL"); url != "" {
+		return url
+	}
+	// Default to docker service name when running in container
+	return "http://tf-vaultwarden:8000"
+}
 
 // GetTestClient returns a singleton test client, creating it if necessary
 func GetTestClient(ctx context.Context, t *testing.T) (*vaultwarden.Client, error) {
