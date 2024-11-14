@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
-
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/provider"
+	"log"
 )
 
 var (

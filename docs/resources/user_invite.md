@@ -28,7 +28,6 @@ resource "vaultwarden_user_invite" "example" {
 ### Read-Only
 
 - `id` (String) ID of the invited user
-- `last_updated` (String) Timestamp of the last Terraform update of the resource.
 
 ## Import
 

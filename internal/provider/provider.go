@@ -28,11 +28,13 @@ type VaultwardenProvider struct {
 
 // VaultwardenProviderModel describes the provider data model.
 type VaultwardenProviderModel struct {
-	Endpoint   types.String `tfsdk:"endpoint"`
-	AdminToken types.String `tfsdk:"admin_token"`
+	Endpoint       types.String `tfsdk:"endpoint"`
+	AdminToken     types.String `tfsdk:"admin_token"`
+	Email          types.String `tfsdk:"email"`
+	MasterPassword types.String `tfsdk:"master_password"`
 }
 
-func (p *VaultwardenProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (p *VaultwardenProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "vaultwarden"
 	resp.Version = p.version
 }
@@ -47,6 +49,15 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 			},
 			"admin_token": schema.StringAttribute{
 				MarkdownDescription: "Token for admin page operations. This requires the `/admin` endpoint to be enabled.",
+				Sensitive:           true,
+				Optional:            true,
+			},
+			"email": schema.StringAttribute{
+				MarkdownDescription: "Email for API operations",
+				Optional:            true,
+			},
+			"master_password": schema.StringAttribute{
+				MarkdownDescription: "Master password for API operations",
 				Sensitive:           true,
 				Optional:            true,
 			},
@@ -83,6 +94,24 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 		)
 	}
 
+	if data.Email.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("email"),
+			"Unknown Vaultwarden email",
+			"The provider cannot create the Vaultwarden API client as there is an unknown configuration value for the Vaultwarden email. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VAULTWARDEN_EMAIL environment variable.",
+		)
+	}
+
+	if data.MasterPassword.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("master_password"),
+			"Unknown Vaultwarden master password",
+			"The provider cannot create the Vaultwarden API client as there is an unknown configuration value for the Vaultwarden master password. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VAULTWARDEN_MASTER_PASSWORD environment variable.",
+		)
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -92,12 +121,20 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 
 	endpoint := os.Getenv("VAULTWARDEN_ENDPOINT")
 	adminToken := os.Getenv("VAULTWARDEN_ADMIN_TOKEN")
+	email := os.Getenv("VAULTWARDEN_EMAIL")
+	masterPassword := os.Getenv("VAULTWARDEN_MASTER_PASSWORD")
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
 	}
 	if !data.AdminToken.IsNull() {
 		adminToken = data.AdminToken.ValueString()
+	}
+	if !data.Email.IsNull() {
+		email = data.Email.ValueString()
+	}
+	if !data.MasterPassword.IsNull() {
+		masterPassword = data.MasterPassword.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
@@ -113,6 +150,14 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 		)
 	}
 
+	if adminToken == "" && (email == "" || masterPassword == "") {
+		resp.Diagnostics.AddError(
+			"Missing authentication credentials",
+			"The provider requires either an admin token or both email and master password for authentication. "+
+				"Please provide either the admin token or user credentials.",
+		)
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -123,6 +168,11 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	// If admin token is provided, add it to options
 	if adminToken != "" {
 		opts = append(opts, vaultwarden.WithAdminToken(adminToken))
+	}
+
+	// Add user credentials if provided
+	if email != "" && masterPassword != "" {
+		opts = append(opts, vaultwarden.WithCredentials(email, masterPassword))
 	}
 
 	// Create a new Vaultwarden API client using the configuration values and options
@@ -145,6 +195,7 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		UserInviteResource,
+		OrganizationResource,
 	}
 }
 
