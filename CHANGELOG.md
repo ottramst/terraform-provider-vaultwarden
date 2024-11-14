@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 * Add `vaultwarden_organization` resource
+* Add `vaultwarden_organization` data source
 
 ## v0.1.0
 
