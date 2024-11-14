@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
-	"net/http"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -87,7 +87,11 @@ func (r *UserInvite) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// Call the client method to invite the user
-	user, err := r.client.InviteUser(data.Email.ValueString())
+	user := models.User{
+		Email: data.Email.ValueString(),
+	}
+
+	userResp, err := r.client.InviteUser(ctx, user)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error inviting user",
@@ -97,7 +101,7 @@ func (r *UserInvite) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	data.ID = types.StringValue(user.ID)
+	data.ID = types.StringValue(userResp.ID)
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -118,19 +122,8 @@ func (r *UserInvite) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 
 	// Get refreshed data from the client
-	user, httpResp, err := r.client.GetUser(data.ID.ValueString())
+	userResp, err := r.client.GetUser(ctx, data.ID.ValueString())
 	if err != nil {
-		// If the user is not found in Vaultwarden, tell Terraform the resource needs to be recreated
-		// instead of returning an error
-		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			tflog.Debug(ctx, "User not found, recreating resource", map[string]interface{}{
-				"email": data.Email.ValueString(),
-			})
-			resp.State.RemoveResource(ctx)
-			return
-		}
-
-		// Otherwise, return an error
 		resp.Diagnostics.AddError(
 			"Error reading Vaultwarden user",
 			"Could not read user with ID "+data.ID.ValueString()+": "+err.Error(),
@@ -139,8 +132,7 @@ func (r *UserInvite) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 
 	// Overwrite the model with the refreshed data
-	data.ID = types.StringValue(user.ID)
-	data.Email = types.StringValue(user.Email)
+	data.Email = types.StringValue(userResp.Email)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -171,7 +163,7 @@ func (r *UserInvite) Delete(ctx context.Context, req resource.DeleteRequest, res
 	}
 
 	// Delete the user
-	if err := r.client.DeleteUser(data.ID.ValueString()); err != nil {
+	if err := r.client.DeleteUser(ctx, data.ID.ValueString()); err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting Vaultwarden user",
 			"Could not delete user with ID "+data.ID.ValueString()+": "+err.Error(),

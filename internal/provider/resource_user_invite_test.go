@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/test"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
@@ -36,8 +37,15 @@ func TestAccUserInvite(t *testing.T) {
 
 func testAccExampleResourceConfig(email string) string {
 	return fmt.Sprintf(`
-resource "vaultwarden_user_invite" "test" {
-  email = %[1]q
+provider "vaultwarden" {
+  endpoint = %[1]q
+  email = %[2]q
+  master_password = %[3]q
+  admin_token = %[4]q
 }
-`, email)
+
+resource "vaultwarden_user_invite" "test" {
+  email = %[5]q
+}
+`, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, email)
 }

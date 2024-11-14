@@ -17,22 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VAULTWARDEN_ADMIN_TOKEN: admin_token
+      VAULTWARDEN_EMAIL: test@example.com
+      VAULTWARDEN_MASTER_PASSWORD: test-password-123!
     services:
-      mailhog:
-        image: mailhog/mailhog
-        ports:
-          - 1025:1025
       vaultwarden:
         image: vaultwarden/server:${{ matrix.vaultwarden_version }}-alpine
         env:
           ROCKET_PORT: "8000"
           ADMIN_TOKEN: ${{ env.VAULTWARDEN_ADMIN_TOKEN }}
-          SMTP_HOST: mailhog
-          SMTP_PORT: "1025"
-          SMTP_SECURITY: off
-          SMTP_FROM: vaultwarden@example.com
-          ADMIN_RATELIMIT_MAX_BURST: "10"
-          ADMIN_RATELIMIT_SECONDS: "60"
+          ADMIN_RATELIMIT_MAX_BURST: "1000"
+          ADMIN_RATELIMIT_SECONDS: "10"
+          LOGIN_RATELIMIT_MAX_BURST: "1000"
+          LOGIN_RATELIMIT_SECONDS: "10"
         ports:
           - 8000:8000
         volumes:
@@ -67,5 +63,5 @@ jobs:
       - name: Terraform Acceptance Tests
         timeout-minutes: 10
         env:
-          VAULTWARDEN_ENDPOINT: http://localhost:8000
+          VW_TEST_URL: http://localhost:8000
         run: make testacc
