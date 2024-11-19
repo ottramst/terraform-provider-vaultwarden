@@ -44,15 +44,64 @@ terraform {
 
 ### Authentication
 
-The Vaultwarden provider supports the following methods of authentication:
+The Vaultwarden provider supports multiple authentication methods, which can be configured through static credentials or environment variables.
 
-* Static credentials in the provider configuration
-* Environment variables
+#### Authentication methods
 
-There are two types of authentication for this provider, neither one is required, but at least one must be provided.
+The provider requires one of the following authentication methods for API operations:
 
-1. Admin token - for managing the `/admin` endpoints
-2. User credentials - for managing the `/api` endpoints
+1. User Credentials Authentication 
+   * Uses email and master password
+   * Required for operations that need user context
+
+   ```hcl
+   provider "vaultwarden" {
+     endpoint        = "https://vaultwarden.example.com"
+     email           = "your-email"
+     master_password = "your-master-password"
+   }
+   ```
+
+2. OAuth2 API Key Authentication
+    * Uses client ID and client secret
+    * Also requires email and master password for encryption/decryption operations
+    * Required if the user has 2FA enabled
+
+    ```hcl
+    provider "vaultwarden" {
+      endpoint        = "https://vault.example.com"
+      email           = "your-email"
+      master_password = "your-master-password"
+      client_id       = "your-client-id"
+      client_secret   = "your-client-secret"
+    }
+    ```
+
+3. Admin Authentication (Optional)
+    * Uses admin token
+    * Required only for `/admin` endpoint operations
+    * Can be combined with either authentication method above
+
+   ```hcl
+   provider "vaultwarden" {
+     endpoint        = "https://vault.example.com"
+      admin_token     = "your-admin-token"
+      
+      # Required: User credentials
+      email           = "user@example.com"
+      master_password = "your-secure-password"
+      
+      # Optional: OAuth2 credentials
+      client_id       = "your-client-id"
+      client_secret   = "your-client-secret"
+   }
+   ```
+
+#### Important notes
+
+* If user credentials are used, `email` and `master_password` are always required
+* Admin token is optional and can be combined with either authentication method
+* Without admin token, `/admin` endpoint operations will not be available
 
 #### Static credentials
 
@@ -73,14 +122,88 @@ provider "vaultwarden" {
 
 #### Environment variables
 
+All credentials can be provided via environment variables:
+
+```shell
+# Required: Endpoint URL
+export VAULTWARDEN_ENDPOINT="https://vault.example.com"
+
+# Method 1: User Credentials
+export VAULTWARDEN_EMAIL="user@example.com"
+export VAULTWARDEN_MASTER_PASSWORD="your-secure-password"
+
+# Method 2: OAuth2 Credentials
+export VAULTWARDEN_CLIENT_ID="your-client-id"
+export VAULTWARDEN_CLIENT_SECRET="your-client-secret"
+
+# Optional: Admin Token
+export VAULTWARDEN_ADMIN_TOKEN="your-admin-token"
+```
+
 * Provide the endpoint URL via the `VAULTWARDEN_ENDPOINT` environment variable
 * Provide the admin token via the `VAULTWARDEN_ADMIN_TOKEN` environment variable
 * Provide the client credentials via the `VAULTWARDEN_EMAIL` and `VAULTWARDEN_MASTER_PASSWORD` environment variables
+* Provide the client credentials via the `VAULTWARDEN_CLIENT_ID` and `VAULTWARDEN_CLIENT_SECRET` environment variables
 
-And use the provider configuration like this:
+When using environment variables, you can use a minimal provider configuration:
 
 ```hcl
 provider "vaultwarden" {}
+```
+
+#### Authentication Method Selection
+
+The provider validates that you're using exactly one authentication method:
+
+✅ Valid Configurations:
+
+```hcl
+# User credentials only
+provider "vaultwarden" {
+   endpoint        = "https://vault.example.com"
+   email           = "user@example.com"
+   master_password = "your-secure-password"
+}
+
+# User credentials with admin token
+provider "vaultwarden" {
+   endpoint        = "https://vault.example.com"
+   email           = "user@example.com"
+   master_password = "your-secure-password"
+   admin_token     = "your-admin-token"
+}
+
+# Full configuration with OAuth2
+provider "vaultwarden" {
+   endpoint        = "https://vault.example.com"
+   email           = "user@example.com"
+   master_password = "your-secure-password"
+   client_id       = "your-client-id"
+   client_secret   = "your-client-secret"
+}
+
+# Admin token only
+provider "vaultwarden" {
+   endpoint    = "https://vault.example.com"
+   admin_token = "your-admin-token"
+}
+```
+
+❌ Invalid Configurations:
+
+```hcl
+# Invalid: Missing user credentials
+provider "vaultwarden" {
+   endpoint      = "https://vault.example.com"
+   client_id     = "your-client-id"
+   client_secret = "your-client-secret"
+}
+
+# Invalid: Missing master password
+provider "vaultwarden" {
+   endpoint    = "https://vault.example.com"
+   email       = "user@example.com"
+}
 ```
 
 ## Developing the provider

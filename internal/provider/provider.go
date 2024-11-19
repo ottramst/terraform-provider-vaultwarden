@@ -2,16 +2,17 @@ package provider
 
 import (
 	"context"
-	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
-	"os"
-
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
+	"os"
 )
 
 // Ensure VaultwardenProvider satisfies various provider interfaces.
@@ -28,10 +29,18 @@ type VaultwardenProvider struct {
 
 // VaultwardenProviderModel describes the provider data model.
 type VaultwardenProviderModel struct {
-	Endpoint       types.String `tfsdk:"endpoint"`
-	AdminToken     types.String `tfsdk:"admin_token"`
+	Endpoint types.String `tfsdk:"endpoint"`
+
+	// Admin Authentication
+	AdminToken types.String `tfsdk:"admin_token"`
+
+	// User Authentication
 	Email          types.String `tfsdk:"email"`
 	MasterPassword types.String `tfsdk:"master_password"`
+
+	// OAuth2 Authentication
+	ClientID     types.String `tfsdk:"client_id"`
+	ClientSecret types.String `tfsdk:"client_secret"`
 }
 
 func (p *VaultwardenProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -41,7 +50,8 @@ func (p *VaultwardenProvider) Metadata(_ context.Context, _ provider.MetadataReq
 
 func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "The Vaultwarden provider allows you to interact with a Vaultwarden server.",
+		MarkdownDescription: "The Vaultwarden provider allows you to interact with a Vaultwarden server.\n\n" +
+			"More information about authentication methods can be found in the [provider repository](https://github.com/ottramst/terraform-provider-vaultwarden#authentication)",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
 				MarkdownDescription: "The endpoint of the Vaultwarden server",
@@ -55,11 +65,46 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 			"email": schema.StringAttribute{
 				MarkdownDescription: "Email for API operations",
 				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AtLeastOneOf(path.Expressions{
+						path.MatchRoot("client_id"),
+						path.MatchRoot("client_secret"),
+					}...),
+				},
 			},
 			"master_password": schema.StringAttribute{
 				MarkdownDescription: "Master password for API operations",
 				Sensitive:           true,
 				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AtLeastOneOf(path.Expressions{
+						path.MatchRoot("client_id"),
+						path.MatchRoot("client_secret"),
+					}...),
+				},
+			},
+			"client_id": schema.StringAttribute{
+				MarkdownDescription: "OAuth2 client ID for API key authentication",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRoot("client_secret"),
+						path.MatchRoot("email"),
+						path.MatchRoot("master_password"),
+					}...),
+				},
+			},
+			"client_secret": schema.StringAttribute{
+				MarkdownDescription: "OAuth2 client secret for API key authentication",
+				Sensitive:           true,
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRoot("client_id"),
+						path.MatchRoot("email"),
+						path.MatchRoot("master_password"),
+					}...),
+				},
 			},
 		},
 	}
@@ -112,17 +157,36 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 		)
 	}
 
+	if data.ClientID.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("client_id"),
+			"Unknown OAuth2 client ID",
+			"The provider cannot create the Vaultwarden API client as there is an unknown configuration value for the OAuth2 client ID. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VAULTWARDEN_CLIENT_ID environment variable.",
+		)
+	}
+
+	if data.ClientSecret.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("client_secret"),
+			"Unknown OAuth2 client secret",
+			"The provider cannot create the Vaultwarden API client as there is an unknown configuration value for the OAuth2 client secret. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VAULTWARDEN_CLIENT_SECRET environment variable.",
+		)
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
-
 	endpoint := os.Getenv("VAULTWARDEN_ENDPOINT")
 	adminToken := os.Getenv("VAULTWARDEN_ADMIN_TOKEN")
 	email := os.Getenv("VAULTWARDEN_EMAIL")
 	masterPassword := os.Getenv("VAULTWARDEN_MASTER_PASSWORD")
+	clientID := os.Getenv("VAULTWARDEN_CLIENT_ID")
+	clientSecret := os.Getenv("VAULTWARDEN_CLIENT_SECRET")
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
@@ -135,6 +199,12 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	}
 	if !data.MasterPassword.IsNull() {
 		masterPassword = data.MasterPassword.ValueString()
+	}
+	if !data.ClientID.IsNull() {
+		clientID = data.ClientID.ValueString()
+	}
+	if !data.ClientSecret.IsNull() {
+		clientSecret = data.ClientSecret.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
@@ -150,29 +220,49 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 		)
 	}
 
-	if adminToken == "" && (email == "" || masterPassword == "") {
+	// Create options slice for client configuration
+	var opts []vaultwarden.ClientOption
+
+	// Check authentication methods
+	hasUserAuth := email != "" && masterPassword != ""
+	hasAPIAuth := clientID != "" && clientSecret != ""
+
+	if !hasUserAuth && !hasAPIAuth {
 		resp.Diagnostics.AddError(
 			"Missing authentication credentials",
-			"The provider requires either an admin token or both email and master password for authentication. "+
-				"Please provide either the admin token or user credentials.",
+			"The provider requires either user credentials (email + master password) or API credentials (client_id + client_secret) for authentication. "+
+				"Please provide one set of credentials either in the configuration or via environment variables.",
 		)
 	}
 
-	if resp.Diagnostics.HasError() {
-		return
+	// If API auth is provided, ensure user auth is also present
+	if hasAPIAuth && !hasUserAuth {
+		resp.Diagnostics.AddError(
+			"Invalid authentication configuration",
+			"When using API credentials (client_id + client_secret), user credentials (email + master password) are also required. "+
+				"Please provide both sets of credentials.",
+		)
 	}
 
-	// Create options slice for client configuration
-	var opts []vaultwarden.Option
+	// Create options for the client
+	if hasAPIAuth {
+		// When using API auth, we need both sets of credentials
+		opts = append(opts,
+			vaultwarden.WithUserCredentials(email, masterPassword),
+			vaultwarden.WithOAuth2Credentials(clientID, clientSecret),
+		)
+	} else {
+		// When using only user auth
+		opts = append(opts, vaultwarden.WithUserCredentials(email, masterPassword))
+	}
 
-	// If admin token is provided, add it to options
+	// Add admin token if provided (optional)
 	if adminToken != "" {
 		opts = append(opts, vaultwarden.WithAdminToken(adminToken))
 	}
 
-	// Add user credentials if provided
-	if email != "" && masterPassword != "" {
-		opts = append(opts, vaultwarden.WithCredentials(email, masterPassword))
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	// Create a new Vaultwarden API client using the configuration values and options
@@ -184,6 +274,7 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 				"If the error is not clear, please contact the provider developers.\n\n"+
 				"Vaultwarden Client Error: "+err.Error(),
 		)
+		return
 	}
 
 	// Make the Vaultwarden client available during DataSource and Resource

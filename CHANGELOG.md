@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+* Add API key support for Vaultwarden client
+
 ## v0.2.0
 
 * Add `vaultwarden_organization` resource

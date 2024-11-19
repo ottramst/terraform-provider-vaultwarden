@@ -5,42 +5,57 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
-// JWTClaims represents the claims in the Vaultwarden JWT
-type JWTClaims struct {
-	NotBefore     int64    `json:"nbf"`
-	ExpiresAt     int64    `json:"exp"`
-	Issuer        string   `json:"iss"`
-	Subject       string   `json:"sub"`
-	Premium       bool     `json:"premium"`
-	Name          string   `json:"name"`
-	Email         string   `json:"email"`
-	EmailVerified bool     `json:"email_verified"`
-	SecurityStamp string   `json:"sstamp"`
-	DeviceId      string   `json:"device"`
-	Scope         []string `json:"scope"`
-	AuthMethods   []string `json:"amr"`
-}
-
-// ParseJWT parses a JWT token string and returns the claims
-func ParseJWT(tokenString string) (*JWTClaims, error) {
+// ParseJWTExpiration parses the expiration time of a JWT token
+func ParseJWTExpiration(tokenString string) (time.Time, error) {
 	// Split the token
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid token format")
+		return time.Time{}, fmt.Errorf("invalid JWT format")
 	}
 
-	// Decode the claims part (second part)
-	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	// Decode the payload
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode claims: %w", err)
+		return time.Time{}, fmt.Errorf("failed to decode JWT payload: %w", err)
 	}
 
-	var claims JWTClaims
-	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
-		return nil, fmt.Errorf("failed to parse claims: %w", err)
+	// Parse the JSON
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse JWT claims: %w", err)
 	}
 
-	return &claims, nil
+	// Convert Unix timestamp to time.Time
+	return time.Unix(claims.Exp, 0), nil
+}
+
+// ParseJWTEmail parses the email of a JWT token
+func ParseJWTEmail(tokenString string) (string, error) {
+	// Split the token
+	parts := strings.Split(tokenString, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("invalid JWT format")
+	}
+
+	// Decode the payload
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("failed to decode JWT payload: %w", err)
+	}
+
+	// Parse the JSON
+	var claims struct {
+		Email string `json:"email"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", fmt.Errorf("failed to parse JWT claims: %w", err)
+	}
+
+	// Convert Unix timestamp to time.Time
+	return claims.Email, nil
 }

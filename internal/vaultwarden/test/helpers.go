@@ -59,7 +59,7 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	// Create client with credentials and admin token
 	client, err := vaultwarden.New(
 		TestBaseURL,
-		vaultwarden.WithCredentials(TestEmail, TestPassword),
+		vaultwarden.WithUserCredentials(TestEmail, TestPassword),
 		vaultwarden.WithAdminToken(TestAdminToken),
 	)
 	if err != nil {
@@ -68,15 +68,15 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	}
 
 	// Do prelogin to get KDF parameters
-	preloginResp, err := client.Prelogin(ctx)
+	preloginResp, err := client.PreLogin(ctx)
 	if err != nil {
 		t.Logf("Prelogin failed: %v", err)
 		return nil, "", fmt.Errorf("prelogin failed: %w", err)
 	}
 	t.Log("Prelogin successful")
 
-	// Create KDF configuration
-	kdfConfig := models.KdfConfiguration{
+	// Build the KDF configuration
+	kdfConfig := &models.KdfConfiguration{
 		KdfType:        preloginResp.Kdf,
 		KdfIterations:  preloginResp.KdfIterations,
 		KdfMemory:      preloginResp.KdfMemory,
@@ -95,7 +95,7 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	hashedPw := crypt.HashPassword(TestPassword, *preloginKey, false)
 
 	// Try to log in first - if successful, the user already exists
-	if _, err := client.Login(ctx, hashedPw); err == nil {
+	if _, err := client.LoginWithUserCredentials(ctx, hashedPw); err == nil {
 		t.Log("User already exists")
 		return client, hashedPw, nil
 	}
@@ -110,7 +110,7 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	t.Log("Encryption key generated")
 
 	// Generate public/private key pair
-	publicKey, encryptedPrivateKey, err := keybuilder.GenerateRSAKeyPair(*encryptionKey)
+	publicKey, encryptedPrivateKey, err := keybuilder.GenerateEncryptedRSAKeyPair(*encryptionKey)
 	if err != nil {
 		t.Logf("Failed to generate RSA key pair: %v", err)
 		return nil, "", fmt.Errorf("failed to generate RSA key pair: %w", err)
@@ -133,7 +133,7 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	}
 
 	// Register user
-	if _, err := client.RegisterUser(ctx, signupReq); err != nil {
+	if err := client.RegisterUser(ctx, signupReq); err != nil {
 		if !isUserExistsError(err) {
 			t.Logf("Failed to register user: %v", err)
 			return nil, "", fmt.Errorf("failed to register user: %w", err)
@@ -143,7 +143,7 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	t.Log("User registered")
 
 	// Login after registration to ensure everything works
-	if _, err := client.Login(ctx, hashedPw); err != nil {
+	if _, err := client.LoginWithUserCredentials(ctx, hashedPw); err != nil {
 		return nil, "", fmt.Errorf("failed to login after registration: %w", err)
 	}
 
@@ -157,7 +157,7 @@ func LoginTestClient(ctx context.Context, t *testing.T) error {
 		return fmt.Errorf("failed to get test client: %w", err)
 	}
 
-	if _, err := client.Login(ctx, hashedPassword); err != nil {
+	if _, err := client.LoginWithUserCredentials(ctx, hashedPassword); err != nil {
 		return fmt.Errorf("failed to login with test account: %w", err)
 	}
 

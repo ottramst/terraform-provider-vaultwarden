@@ -8,6 +8,27 @@ import (
 	"net/mail"
 )
 
+// RegisterUserRequest represents the request body for registering a user
+type RegisterUserRequest struct {
+	Email              string         `json:"email"`
+	MasterPasswordHash string         `json:"masterPasswordHash"`
+	Key                string         `json:"key"`
+	Kdf                models.KdfType `json:"kdf"`
+	KdfIterations      int            `json:"kdfIterations"`
+	KdfMemory          int            `json:"kdfMemory"`
+	KdfParallelism     int            `json:"kdfParallelism"`
+	Keys               models.KeyPair `json:"keys"`
+}
+
+// RegisterUser registers a new user
+func (c *Client) RegisterUser(ctx context.Context, req RegisterUserRequest) error {
+	if _, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/api/accounts/register", req, nil); err != nil {
+		return fmt.Errorf("failed to register user: %w", err)
+	}
+
+	return nil
+}
+
 // InviteUser invites a new user to Vaultwarden
 func (c *Client) InviteUser(ctx context.Context, user models.User) (*models.User, error) {
 	// Validate email format
@@ -16,7 +37,7 @@ func (c *Client) InviteUser(ctx context.Context, user models.User) (*models.User
 	}
 
 	var userResp models.User
-	if err := c.Post(ctx, "/admin/invite", user, &userResp); err != nil {
+	if _, err := c.doRequest(ctx, http.MethodPost, "/admin/invite", user, &userResp); err != nil {
 		return nil, fmt.Errorf("failed to invite user: %w", err)
 	}
 
@@ -30,7 +51,7 @@ func (c *Client) GetUser(ctx context.Context, ID string) (*models.User, error) {
 	}
 
 	var user models.User
-	if err := c.Get(ctx, fmt.Sprintf("/admin/users/%s", ID), &user); err != nil {
+	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/admin/users/%s", ID), nil, &user); err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
@@ -43,31 +64,9 @@ func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 		return fmt.Errorf("user ID is required")
 	}
 
-	if err := c.Post(ctx, fmt.Sprintf("/admin/users/%s/delete", ID), nil, nil); err != nil {
+	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/admin/users/%s/delete", ID), nil, nil); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
 	return nil
-}
-
-// RegisterUserRequest represents the request body for registering a user
-type RegisterUserRequest struct {
-	Email              string         `json:"email"`
-	MasterPasswordHash string         `json:"masterPasswordHash"`
-	Key                string         `json:"key"`
-	Kdf                models.KdfType `json:"kdf"`
-	KdfIterations      int            `json:"kdfIterations"`
-	KdfMemory          int            `json:"kdfMemory"`
-	KdfParallelism     int            `json:"kdfParallelism"`
-	Keys               models.KeyPair `json:"keys"`
-}
-
-// RegisterUser registers a new user to Vaultwarden
-func (c *Client) RegisterUser(ctx context.Context, req RegisterUserRequest) (*models.User, error) {
-	var user models.User
-	if err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/api/accounts/register", req, &user); err != nil {
-		return nil, fmt.Errorf("failed to register user: %w", err)
-	}
-
-	return &user, nil
 }

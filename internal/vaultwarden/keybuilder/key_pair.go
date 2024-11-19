@@ -10,12 +10,11 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/symmetrickey"
 )
 
-func GenerateRSAKeyPair(key symmetrickey.Key) (string, string, error) {
+func GenerateEncryptedRSAKeyPair(key symmetrickey.Key) (string, string, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return "", "", fmt.Errorf("error generating rsa key: %w", err)
 	}
-
 	return EncryptRSAKeyPair(key, privateKey)
 }
 
