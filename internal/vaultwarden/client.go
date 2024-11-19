@@ -114,6 +114,8 @@ func prepareRequestBody(reqBody interface{}) (io.Reader, string, error) {
 }
 
 // doUnauthenticatedRequest performs a request without authentication
+//
+//nolint:unparam
 func (c *Client) doUnauthenticatedRequest(ctx context.Context, method, path string, reqBody, respBody interface{}) (*http.Response, error) {
 	// Prepare request body
 	bodyReader, contentType, err := prepareRequestBody(reqBody)
@@ -163,6 +165,8 @@ func (c *Client) doUnauthenticatedRequest(ctx context.Context, method, path stri
 }
 
 // doRequest performs a request with appropriate authentication
+//
+//nolint:unparam
 func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, respBody interface{}) (*http.Response, error) {
 	// Prepare request body
 	bodyReader, contentType, err := prepareRequestBody(reqBody)
