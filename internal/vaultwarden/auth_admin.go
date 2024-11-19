@@ -55,7 +55,7 @@ func (c *Client) adminLogin(ctx context.Context) error {
 
 	// Look for admin cookie
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "VM_ADMIN" {
+		if cookie.Name == "VW_ADMIN" {
 			if c.AuthState == nil {
 				c.AuthState = &AuthState{}
 			}
