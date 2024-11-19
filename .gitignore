@@ -37,3 +37,4 @@ website/vendor
 testing/
 terraform-provider-vaultwarden
 TODO
+*.out

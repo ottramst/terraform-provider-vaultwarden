@@ -2,11 +2,10 @@ package provider
 
 import (
 	"context"
-	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/test"
-	"testing"
-
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/test"
+	"testing"
 )
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during

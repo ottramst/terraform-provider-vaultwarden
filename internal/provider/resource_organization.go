@@ -109,13 +109,6 @@ func (r *Organization) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	// Handle default values
-	if data.BillingEmail.IsNull() || data.BillingEmail.IsUnknown() {
-		// Use the client's email as the default billing email
-		email := r.client.GetEmail()
-		data.BillingEmail = types.StringValue(email)
-	}
-
 	// Call the client method to create the organization
 	org := models.Organization{
 		Name:           data.Name.ValueString(),
@@ -134,6 +127,8 @@ func (r *Organization) Create(ctx context.Context, req resource.CreateRequest, r
 
 	// Map response body to schema and populate Computed attribute values
 	data.ID = types.StringValue(orgResp.ID)
+	data.Name = types.StringValue(orgResp.Name)
+	data.BillingEmail = types.StringValue(orgResp.BillingEmail)
 	data.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Write logs using the tflog package

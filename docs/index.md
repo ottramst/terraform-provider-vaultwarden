@@ -4,20 +4,33 @@ page_title: "vaultwarden Provider"
 subcategory: ""
 description: |-
   The Vaultwarden provider allows you to interact with a Vaultwarden server.
+  More information about authentication methods can be found in the provider repository https://github.com/ottramst/terraform-provider-vaultwarden#authentication
 ---
 
 # vaultwarden Provider
 
 The Vaultwarden provider allows you to interact with a Vaultwarden server.
 
+More information about authentication methods can be found in the [provider repository](https://github.com/ottramst/terraform-provider-vaultwarden#authentication)
+
 ## Example Usage
 
 ```terraform
 provider "vaultwarden" {
-  endpoint        = "https://vaultwarden.example.com"
-  admin_token     = "your-token-here"
+  endpoint = "https://vaultwarden.example.com"
+
+  # Required: User Authentication
   email           = "your-email-here"
   master_password = "your-master-password-here"
+
+  # Optional: API Authentication (OAuth2)
+  # When using OAuth2, user authentication above is still required
+  # client_id     = "your-client-id"
+  # client_secret = "your-client-secret"
+
+  # Optional: Admin Authentication
+  # Required only for /admin endpoint operations
+  # admin_token = "your-token-here"
 }
 ```
 
@@ -27,6 +40,8 @@ provider "vaultwarden" {
 ### Optional
 
 - `admin_token` (String, Sensitive) Token for admin page operations. This requires the `/admin` endpoint to be enabled.
+- `client_id` (String) OAuth2 client ID for API key authentication
+- `client_secret` (String, Sensitive) OAuth2 client secret for API key authentication
 - `email` (String) Email for API operations
 - `endpoint` (String) The endpoint of the Vaultwarden server
 - `master_password` (String, Sensitive) Master password for API operations

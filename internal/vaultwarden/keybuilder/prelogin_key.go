@@ -9,11 +9,11 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-func BuildPreloginKey(masterPassword, email string, kdfConfig models.KdfConfiguration) (*symmetrickey.Key, error) {
+func BuildPreloginKey(masterPassword, email string, kdfConfig *models.KdfConfiguration) (*symmetrickey.Key, error) {
 	return buildKey(masterPassword, email, kdfConfig)
 }
 
-func buildKey(masterPassword, salt string, kdfConfig models.KdfConfiguration) (*symmetrickey.Key, error) {
+func buildKey(masterPassword, salt string, kdfConfig *models.KdfConfiguration) (*symmetrickey.Key, error) {
 	var rawKey []byte
 	switch kdfConfig.KdfType {
 	case models.KdfTypePBKDF2_SHA256:
