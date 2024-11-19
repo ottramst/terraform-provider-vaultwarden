@@ -44,7 +44,12 @@ func (c *Client) adminLogin(ctx context.Context) error {
 	// Make login request
 	resp, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/admin", form, nil)
 	if err != nil {
-		return fmt.Errorf("admin login request failed: %w", err)
+		// Check if this is a redirect error (which we expect)
+		if resp != nil && resp.StatusCode == http.StatusSeeOther {
+			// This is fine, continue processing
+		} else {
+			return fmt.Errorf("admin login request failed: %w", err)
+		}
 	}
 	defer resp.Body.Close()
 
