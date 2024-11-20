@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/symmetrickey"
 	"net/http"
 	"strings"
 	"time"
@@ -19,6 +20,12 @@ const (
 	AuthMethodOAuth2
 )
 
+type OrganizationSecret struct {
+	Key              symmetrickey.Key
+	OrganizationUUID string
+	Name             string
+}
+
 // AuthState holds the current authentication state
 type AuthState struct {
 	// Admin authentication
@@ -29,6 +36,9 @@ type AuthState struct {
 	TokenExpiresAt time.Time // JWT expiration time
 	PrivateKey     *rsa.PrivateKey
 	KdfConfig      *models.KdfConfiguration
+
+	// Organizations data
+	Organizations map[string]OrganizationSecret
 }
 
 // validateCredentials ensures that the provided credentials meet the requirements

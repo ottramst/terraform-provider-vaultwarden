@@ -50,20 +50,22 @@ func DecryptEncryptionKey(encryptedKeyStr string, key symmetrickey.Key) (*symmet
 	if err != nil {
 		return nil, fmt.Errorf("error decrypting encryption key: %w", err)
 	}
-	if encKeyCipher.Key.EncryptionType == symmetrickey.AesCbc256_B64 {
+
+	switch encKeyCipher.Key.EncryptionType {
+	case symmetrickey.AesCbc256_B64:
 		decEncKey, err = Decrypt(encKeyCipher, &key)
 		if err != nil {
 			return nil, fmt.Errorf("error decrypting encryption key: %w", err)
 		}
-	} else if encKeyCipher.Key.EncryptionType == symmetrickey.AesCbc256_HmacSha256_B64 {
+	case symmetrickey.AesCbc256_HmacSha256_B64:
 		newKey := key.StretchKey()
 
 		decEncKey, err = Decrypt(encKeyCipher, &newKey)
 		if err != nil {
 			return nil, fmt.Errorf("error decrypting encryption key: %w", err)
 		}
-	} else {
-		return nil, fmt.Errorf("unsupported encryption key type")
+	default:
+		return nil, fmt.Errorf("unsupported encryption key type: %d", encKeyCipher.Key.EncryptionType)
 	}
 
 	encryptionKey, err := symmetrickey.NewFromRawBytes(decEncKey)
@@ -76,22 +78,22 @@ func DecryptEncryptionKey(encryptedKeyStr string, key symmetrickey.Key) (*symmet
 func DecryptPrivateKey(encryptedPrivateKeyStr string, encryptionKey symmetrickey.Key) (*rsa.PrivateKey, error) {
 	encString, err := encryptedstring.NewFromEncryptedValue(encryptedPrivateKeyStr)
 	if err != nil {
-		return nil, fmt.Errorf("error decrypting private key: %w", err)
+		return nil, fmt.Errorf("failed to parse encrypted private key value: %w", err)
 	}
 
 	decryptedPrivateKey, err := Decrypt(encString, &encryptionKey)
 	if err != nil {
-		return nil, fmt.Errorf("error decrypting private key: %w", err)
+		return nil, fmt.Errorf("failed to decrypt the private key using the provided encryption key: %w", err)
 	}
 
 	p, err := x509.ParsePKCS8PrivateKey(decryptedPrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error parse private key: %w", err)
+		return nil, fmt.Errorf("failed to parse decrypted private key in PKCS8 format: %w", err)
 	}
 
 	privateKey, ok := p.(*rsa.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert to rsa.PrivateKey")
+		return nil, fmt.Errorf("parsed private key is not an RSA private key")
 	}
 
 	return privateKey, nil

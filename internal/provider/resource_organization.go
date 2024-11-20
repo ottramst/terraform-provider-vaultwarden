@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
-	"time"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -32,7 +31,6 @@ type Organization struct {
 // OrganizationModel describes the resource data model.
 type OrganizationModel struct {
 	ID             types.String `tfsdk:"id"`
-	LastUpdated    types.String `tfsdk:"last_updated"`
 	Name           types.String `tfsdk:"name"`
 	BillingEmail   types.String `tfsdk:"billing_email"`
 	CollectionName types.String `tfsdk:"collection_name"`
@@ -52,10 +50,6 @@ func (r *Organization) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
-			},
-			"last_updated": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "Timestamp of the last update",
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the organization",
@@ -129,7 +123,6 @@ func (r *Organization) Create(ctx context.Context, req resource.CreateRequest, r
 	data.ID = types.StringValue(orgResp.ID)
 	data.Name = types.StringValue(orgResp.Name)
 	data.BillingEmail = types.StringValue(orgResp.BillingEmail)
-	data.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -190,8 +183,6 @@ func (r *Organization) Update(ctx context.Context, req resource.UpdateRequest, r
 		)
 		return
 	}
-
-	data.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -25,7 +25,6 @@ func TestAccOrganization(t *testing.T) {
 					resource.TestCheckResourceAttr("vaultwarden_organization.test", "billing_email", test.TestEmail),
 					resource.TestCheckResourceAttr("vaultwarden_organization.test", "collection_name", "Default Collection"),
 					resource.TestCheckResourceAttrSet("vaultwarden_organization.test", "id"),
-					resource.TestCheckResourceAttrSet("vaultwarden_organization.test", "last_updated"),
 				),
 			},
 			// Update and Read testing
@@ -37,7 +36,6 @@ func TestAccOrganization(t *testing.T) {
 					// collection_name shouldn't change on update
 					resource.TestCheckResourceAttr("vaultwarden_organization.test", "collection_name", "Default Collection"),
 					resource.TestCheckResourceAttrSet("vaultwarden_organization.test", "id"),
-					resource.TestCheckResourceAttrSet("vaultwarden_organization.test", "last_updated"),
 				),
 			},
 			// ImportState testing
