@@ -43,9 +43,10 @@ func TestAccOrganizationCollection(t *testing.T) {
 			},
 			// ImportState testing
 			{
-				ResourceName:      "vaultwarden_organization_collection.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "vaultwarden_organization_collection.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"external_id"}, // Ignore external_id during import verification
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
 					rs, ok := s.RootModule().Resources["vaultwarden_organization_collection.test"]
 					if !ok {

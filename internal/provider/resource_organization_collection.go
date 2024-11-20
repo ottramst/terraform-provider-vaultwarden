@@ -132,7 +132,13 @@ func (r *OrganizationCollection) Create(ctx context.Context, req resource.Create
 
 	// Map response body to schema and populate Computed attribute values
 	data.ID = types.StringValue(collResp.ID)
-	if collResp.ExternalID == "" {
+
+	// If we're trying to set an external_id, but the API returns empty or null,
+	// keep our desired value from the configuration
+	// See: https://github.com/dani-garcia/vaultwarden/pull/3690
+	if collResp.ExternalID == "" && !data.ExternalID.IsNull() {
+		// Keep the existing external_id from our state
+	} else if collResp.ExternalID == "" {
 		data.ExternalID = types.StringNull()
 	} else {
 		data.ExternalID = types.StringValue(collResp.ExternalID)
@@ -198,7 +204,13 @@ func (r *OrganizationCollection) Read(ctx context.Context, req resource.ReadRequ
 
 	// Overwrite the model with the refreshed data
 	data.Name = types.StringValue(string(decryptedBytes))
-	if collResp.ExternalID == "" {
+
+	// If we're trying to set an external_id, but the API returns empty or null,
+	// keep our desired value from the configuration
+	// See: https://github.com/dani-garcia/vaultwarden/pull/3690
+	if collResp.ExternalID == "" && !data.ExternalID.IsNull() {
+		// Keep the existing external_id from our state
+	} else if collResp.ExternalID == "" {
 		data.ExternalID = types.StringNull()
 	} else {
 		data.ExternalID = types.StringValue(collResp.ExternalID)
@@ -272,4 +284,51 @@ func (r *OrganizationCollection) ImportState(ctx context.Context, req resource.I
 	// Set the organization_id and id attributes
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_id"), organizationID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), collectionID)...)
+
+	// After setting the IDs, fetch the current state of the resource
+	collection, err := r.client.GetOrganizationCollection(ctx, idParts[0], idParts[1])
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing organization collection",
+			fmt.Sprintf("Cannot read organization collection %s: %v", req.ID, err),
+		)
+		return
+	}
+
+	// Get organization data from cache
+	orgSecret, exists := r.client.AuthState.Organizations[idParts[0]]
+	if !exists {
+		resp.Diagnostics.AddError(
+			"Error importing organization collection",
+			"Could not read organization collection, organization not found or not authenticated",
+		)
+		return
+	}
+
+	// Convert and decrypt the name
+	encryptedName, err := encryptedstring.NewFromEncryptedValue(collection.Name)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing organization collection",
+			fmt.Sprintf("Failed to parse encrypted name: %v", err),
+		)
+		return
+	}
+
+	decryptedBytes, err := crypt.Decrypt(encryptedName, &orgSecret.Key)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error importing organization collection",
+			fmt.Sprintf("Failed to decrypt name: %v", err),
+		)
+		return
+	}
+
+	// Set the name
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), string(decryptedBytes))...)
+
+	// Set external_id if it exists
+	if collection.ExternalID != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("external_id"), collection.ExternalID)...)
+	}
 }
