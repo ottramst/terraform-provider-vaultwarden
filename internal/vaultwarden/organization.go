@@ -57,6 +57,18 @@ func (c *Client) CreateOrganization(ctx context.Context, org models.Organization
 		return nil, fmt.Errorf("failed to create organization: %w", err)
 	}
 
+	// Cache the organization secret
+	if c.AuthState != nil {
+		if c.AuthState.Organizations == nil {
+			c.AuthState.Organizations = make(map[string]OrganizationSecret)
+		}
+		c.AuthState.Organizations[orgResp.ID] = OrganizationSecret{
+			Key:              *sharedKey,
+			OrganizationUUID: orgResp.ID,
+			Name:             orgResp.Name,
+		}
+	}
+
 	return &orgResp, nil
 }
 

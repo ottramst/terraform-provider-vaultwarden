@@ -7,6 +7,7 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/helpers"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/keybuilder"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/symmetrickey"
 	"net/http"
 	"net/url"
 	"time"
@@ -114,6 +115,41 @@ func (c *Client) userLogin(ctx context.Context) error {
 	c.AuthState.AccessToken = tokenResp.AccessToken
 	c.AuthState.PrivateKey = privateKey
 	c.AuthState.TokenExpiresAt = expirationTime
+
+	// Getch the user profile
+	user, err := c.GetProfile(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get user profile: %w", err)
+	}
+
+	// Initialize or clear org keys map
+	c.AuthState.Organizations = make(map[string]OrganizationSecret)
+
+	// Save organizations to auth state
+	for _, org := range user.Organizations {
+		if !org.Enabled || org.Key == "" {
+			continue
+		}
+
+		// Decrypt the organization key
+		decryptedKeyBytes, err := keybuilder.RSADecrypt(org.Key, c.AuthState.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt organization key for org %s: %w", org.ID, err)
+		}
+
+		// Convert decrypted key to symmetrickey.Key
+		decryptedKey, err := symmetrickey.NewFromRawBytes(decryptedKeyBytes)
+		if err != nil {
+			return fmt.Errorf("failed to construct symmetric key for org %s: %w", org.ID, err)
+		}
+
+		// Store the decrypted key and org info
+		c.AuthState.Organizations[org.ID] = OrganizationSecret{
+			Key:              *decryptedKey,
+			OrganizationUUID: org.ID,
+			Name:             org.Name,
+		}
+	}
 
 	return nil
 }

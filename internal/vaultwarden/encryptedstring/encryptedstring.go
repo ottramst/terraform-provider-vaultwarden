@@ -33,8 +33,9 @@ func New(iv, data, hmac []byte, key symmetrickey.Key) EncryptedString {
 
 func NewFromEncryptedValue(encryptedValue string) (*EncryptedString, error) {
 	if len(encryptedValue) == 0 {
-		return nil, fmt.Errorf("supposedly encrypted string is empty")
+		return nil, fmt.Errorf("the provided encrypted value is empty")
 	}
+
 	var encPieces []string
 	encString := EncryptedString{}
 
@@ -42,7 +43,7 @@ func NewFromEncryptedValue(encryptedValue string) (*EncryptedString, error) {
 	if len(headerPieces) == 2 {
 		s, err := strconv.ParseInt(headerPieces[0], 10, 8)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse encryption type: %w", err)
+			return nil, fmt.Errorf("unable to parse encryption type from header: %w, header: %s", err, headerPieces[0])
 		}
 		encString.Key.EncryptionType = symmetrickey.EncryptionType(s)
 		encPieces = strings.Split(headerPieces[1], "|")

@@ -287,6 +287,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 	return []func() resource.Resource{
 		UserInviteResource,
 		OrganizationResource,
+		OrganizationCollectionResource,
 	}
 }
 
