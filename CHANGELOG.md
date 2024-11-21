@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+* Add `vaultwarden_account_register` resource
+
 ## v0.3.0
 
 * Add API key support for Vaultwarden client
