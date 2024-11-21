@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## v0.4.0
+
 * Add `vaultwarden_account_register` resource
 * Add `vaultwarden_organization_user` resource 
 
