@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestAccUserInvite(t *testing.T) {
+func TestAccUser(t *testing.T) {
 	// Generate a random email address for the test
 	email := gofakeit.Email()
 
@@ -21,12 +21,12 @@ func TestAccUserInvite(t *testing.T) {
 			{
 				Config: testAccExampleResourceConfig(email),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("vaultwarden_user_invite.test", "email", email),
+					resource.TestCheckResourceAttr("vaultwarden_user.test", "email", email),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "vaultwarden_user_invite.test",
+				ResourceName:      "vaultwarden_user.test",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -44,7 +44,7 @@ provider "vaultwarden" {
   admin_token = %[4]q
 }
 
-resource "vaultwarden_user_invite" "test" {
+resource "vaultwarden_user" "test" {
   email = %[5]q
 }
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, email)

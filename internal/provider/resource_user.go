@@ -15,35 +15,35 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &UserInvite{}
-var _ resource.ResourceWithImportState = &UserInvite{}
+var _ resource.Resource = &User{}
+var _ resource.ResourceWithImportState = &User{}
 
-func UserInviteResource() resource.Resource {
-	return &UserInvite{}
+func UserResource() resource.Resource {
+	return &User{}
 }
 
-// UserInvite defines the resource implementation.
-type UserInvite struct {
+// User defines the resource implementation.
+type User struct {
 	client *vaultwarden.Client
 }
 
-// UserInviteModel describes the resource data model.
-type UserInviteModel struct {
+// UserModel describes the resource data model.
+type UserModel struct {
 	Email types.String `tfsdk:"email"`
 	ID    types.String `tfsdk:"id"`
 }
 
-func (r *UserInvite) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_user_invite"
+func (r *User) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_user"
 }
 
-func (r *UserInvite) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *User) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "This resource invites a user to the Vaultwarden server.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "ID of the invited user",
+				MarkdownDescription: "ID of the user",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -56,7 +56,7 @@ func (r *UserInvite) Schema(ctx context.Context, req resource.SchemaRequest, res
 	}
 }
 
-func (r *UserInvite) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *User) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
@@ -76,8 +76,8 @@ func (r *UserInvite) Configure(ctx context.Context, req resource.ConfigureReques
 	r.client = client
 }
 
-func (r *UserInvite) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data UserInviteModel
+func (r *User) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data UserModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -111,8 +111,8 @@ func (r *UserInvite) Create(ctx context.Context, req resource.CreateRequest, res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *UserInvite) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data UserInviteModel
+func (r *User) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data UserModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -138,8 +138,8 @@ func (r *UserInvite) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *UserInvite) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data UserInviteModel
+func (r *User) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data UserModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -152,8 +152,8 @@ func (r *UserInvite) Update(ctx context.Context, req resource.UpdateRequest, res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *UserInvite) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data UserInviteModel
+func (r *User) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data UserModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -172,6 +172,6 @@ func (r *UserInvite) Delete(ctx context.Context, req resource.DeleteRequest, res
 	}
 }
 
-func (r *UserInvite) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *User) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
