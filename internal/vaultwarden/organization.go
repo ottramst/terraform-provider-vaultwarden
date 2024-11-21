@@ -8,6 +8,7 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/keybuilder"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"net/http"
+	"net/mail"
 )
 
 // CreateOrganization creates a new Vaultwarden organization
@@ -142,4 +143,21 @@ func (c *Client) DeleteOrganization(ctx context.Context, ID string) error {
 	}
 
 	return nil
+}
+
+// InviteOrganizationUserRequest represents the request body for inviting a user to an organization
+type InviteOrganizationUserRequest struct {
+	Emails               []string `json:"emails"`
+	Collections          []string `json:"collections"` // TODO
+	AccessAll            bool     `json:"accessAll"`
+	AccessSecretsManager bool     `json:"accessSecretsManager"`
+	Type                 int64    `json:"type"` // TODO: Implement some type of user role
+}
+
+// InviteOrganizationUser invites a new user to an organization
+func (c *Client) InviteOrganizationUser(ctx context.Context, user models.User) {
+	// Validate email format
+	if _, err := mail.ParseAddress(user.Email); err != nil {
+		return nil, fmt.Errorf("invalid email format: %s", user.Email)
+	}
 }
