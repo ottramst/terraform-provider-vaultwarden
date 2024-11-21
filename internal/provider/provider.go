@@ -285,10 +285,11 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		UserInviteResource,
+		UserResource,
 		OrganizationResource,
 		OrganizationCollectionResource,
 		AccountRegisterResource,
+		OrganizationUserResource,
 	}
 }
 
