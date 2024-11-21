@@ -38,7 +38,6 @@ resource "vaultwarden_organization_collection" "example" {
 ### Read-Only
 
 - `id` (String) ID of the organization collection
-- `last_updated` (String) Timestamp of the last update
 
 ## Import
 
