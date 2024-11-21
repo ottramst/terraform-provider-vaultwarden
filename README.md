@@ -20,9 +20,6 @@ The provider supports Vaultwarden versions:
 * 1.30.x
 * 1.29.x
 * 1.28.x
-* 1.27.x
-* 1.26.x
-* 1.25.x
 
 For proper provider functionality, your Vaultwarden instance must have admin access configured. See Vaultwarden's Admin Page documentation for setup instructions.
 Access to the admin API is granted via passing the `admin_token` to the provider configuration. If this is not provided, the provider will not be able to manage the `/admin` endpoints.

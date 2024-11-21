@@ -12,6 +12,7 @@ import (
 type RegisterUserRequest struct {
 	Email              string         `json:"email"`
 	MasterPasswordHash string         `json:"masterPasswordHash"`
+	Name               string         `json:"name"`
 	Key                string         `json:"key"`
 	Kdf                models.KdfType `json:"kdf"`
 	KdfIterations      int            `json:"kdfIterations"`
@@ -69,4 +70,14 @@ func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 	}
 
 	return nil
+}
+
+// GetUserByEmail retrieves a user by their email address
+func (c *Client) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	var user models.User
+	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/admin/users/by-mail/%s", email), nil, &user); err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
 }
