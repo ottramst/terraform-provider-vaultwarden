@@ -16,6 +16,7 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &User{}
+var _ resource.ResourceWithConfigure = &User{}
 var _ resource.ResourceWithImportState = &User{}
 
 func UserResource() resource.Resource {
@@ -39,7 +40,7 @@ func (r *User) Metadata(ctx context.Context, req resource.MetadataRequest, resp 
 
 func (r *User) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "This resource invites a user to the Vaultwarden server.",
+		MarkdownDescription: "This resource invites a user to the Vaultwarden server.\n\nRequires `admin_token` to be set in the provider configuration.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

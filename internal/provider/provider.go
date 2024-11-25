@@ -55,7 +55,7 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
 				MarkdownDescription: "The endpoint of the Vaultwarden server",
-				Optional:            true,
+				Required:            true,
 			},
 			"admin_token": schema.StringAttribute{
 				MarkdownDescription: "Token for admin page operations. This requires the `/admin` endpoint to be enabled.",
@@ -224,13 +224,14 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	var opts []vaultwarden.ClientOption
 
 	// Check authentication methods
+	hasAdminAuth := adminToken != ""
 	hasUserAuth := email != "" && masterPassword != ""
 	hasAPIAuth := clientID != "" && clientSecret != ""
 
-	if !hasUserAuth && !hasAPIAuth {
+	if !hasUserAuth && !hasAPIAuth && !hasAdminAuth {
 		resp.Diagnostics.AddError(
 			"Missing authentication credentials",
-			"The provider requires either user credentials (email + master password) or API credentials (client_id + client_secret) for authentication. "+
+			"The provider requires at least one authentication method to be provided. "+
 				"Please provide one set of credentials either in the configuration or via environment variables.",
 		)
 	}
@@ -285,11 +286,11 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		UserResource,
-		OrganizationResource,
-		OrganizationCollectionResource,
 		AccountRegisterResource,
+		OrganizationCollectionResource,
+		OrganizationResource,
 		OrganizationUserResource,
+		UserResource,
 	}
 }
 

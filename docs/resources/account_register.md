@@ -5,6 +5,7 @@ subcategory: ""
 description: |-
   This resource registers a new account on the Vaultwarden server.
   This resource will save the password in plain text to the state! Use caution!
+  Requires admin_token to be set in the provider configuration.
 ---
 
 # vaultwarden_account_register (Resource)
@@ -12,6 +13,8 @@ description: |-
 This resource registers a new account on the Vaultwarden server.
 
 This resource will save the password in plain text to the state! Use caution!
+
+Requires `admin_token` to be set in the provider configuration.
 
 ## Example Usage
 

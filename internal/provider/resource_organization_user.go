@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -19,7 +20,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &OrganizationUser{}
-var _ resource.ResourceWithImportState = &User{}
+var _ resource.ResourceWithConfigure = &OrganizationUser{}
+var _ resource.ResourceWithImportState = &OrganizationUser{}
 
 func OrganizationUserResource() resource.Resource {
 	return &OrganizationUser{}
@@ -66,6 +68,7 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				MarkdownDescription: "The role type of the user (Owner, Admin, User, Manager). Defaults to `User`",
 				Computed:            true,
 				Optional:            true,
+				Default:             stringdefault.StaticString("User"),
 				Validators: []validator.String{
 					stringvalidator.OneOf("Owner", "Admin", "User", "Manager"),
 				},
@@ -111,7 +114,7 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	// Parse the type string into a UserOrgType
+	// Parse the type string into a UserOrgType (value will always be present due to schema default)
 	var userType models.UserOrgType
 	if err := userType.FromString(data.Type.ValueString()); err != nil {
 		resp.Diagnostics.AddError(
@@ -147,6 +150,7 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 	// Map response body to schema and populate Computed attribute values
 	data.ID = types.StringValue(userResp.ID)
 	data.Status = types.StringValue(userResp.Status.String())
+	data.Type = types.StringValue(userResp.Type.String())
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log

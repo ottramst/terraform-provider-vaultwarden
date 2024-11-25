@@ -15,7 +15,6 @@ The Vaultwarden provider allows you to manage and configure [Vaultwarden](https:
 
 The provider supports Vaultwarden versions:
 * 1.32.x
-* 1.32.x
 * 1.31.x
 * 1.30.x
 * 1.29.x
@@ -99,6 +98,7 @@ The provider requires one of the following authentication methods for API operat
 * If user credentials are used, `email` and `master_password` are always required
 * Admin token is optional and can be combined with either authentication method
 * Without admin token, `/admin` endpoint operations will not be available
+* At least one authentication method must be set for the provider
 
 #### Static credentials
 

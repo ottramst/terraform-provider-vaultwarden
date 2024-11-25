@@ -17,6 +17,7 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &AccountRegister{}
+var _ resource.ResourceWithConfigure = &AccountRegister{}
 
 func AccountRegisterResource() resource.Resource {
 	return &AccountRegister{}
@@ -41,7 +42,7 @@ func (r *AccountRegister) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *AccountRegister) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "This resource registers a new account on the Vaultwarden server.\n\nThis resource will save the password in plain text to the state! Use caution!",
+		MarkdownDescription: "This resource registers a new account on the Vaultwarden server.\n\nThis resource will save the password in plain text to the state! Use caution!\n\nRequires `admin_token` to be set in the provider configuration.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
