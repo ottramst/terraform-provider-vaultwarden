@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## v0.4.3
+
+* Add `access_all` attribute to `vaultwarden_organization_user` resource
+* Add proper update logic to `vaultwarden_organization_user` resource
+* Update tests for `vaultwarden_organization_user` resource
+
 ## v0.4.2
 
 * Fix bug where all auth methods were being required for the client

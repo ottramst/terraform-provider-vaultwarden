@@ -109,10 +109,11 @@ type OrganizationCollections struct {
 
 // OrganizationUserDetails represents a user in an organization
 type OrganizationUserDetails struct {
-	ID     string        `json:"id"`
-	Email  string        `json:"email"`
-	Status UserOrgStatus `json:"status"`
-	Type   UserOrgType   `json:"type"`
+	ID        string        `json:"id"`
+	Email     string        `json:"email"`
+	Status    UserOrgStatus `json:"status"`
+	Type      UserOrgType   `json:"type"`
+	AccessAll bool          `json:"accessAll"`
 }
 
 // OrganizationUsers represents a list of users in an organization

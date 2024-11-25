@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -38,6 +39,7 @@ type OrganizationUserModel struct {
 	OrganizationID types.String `tfsdk:"organization_id"`
 	Email          types.String `tfsdk:"email"`
 	Type           types.String `tfsdk:"type"`
+	AccessAll      types.Bool   `tfsdk:"access_all"`
 	Status         types.String `tfsdk:"status"`
 }
 
@@ -72,6 +74,12 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.OneOf("Owner", "Admin", "User", "Manager"),
 				},
+			},
+			"access_all": schema.BoolAttribute{
+				MarkdownDescription: "Whether the user has access to all collections in the organization. Defaults to `false`",
+				Computed:            true,
+				Optional:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "The status of the user",
@@ -126,7 +134,8 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 
 	// Call the client method to invite the user
 	inviteReq := vaultwarden.InviteOrganizationUserRequest{
-		Type: userType,
+		Type:      userType,
+		AccessAll: data.AccessAll.ValueBool(),
 	}
 
 	if err := r.client.InviteOrganizationUser(ctx, inviteReq, data.Email.ValueString(), data.OrganizationID.ValueString()); err != nil {
@@ -150,6 +159,7 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 	// Map response body to schema and populate Computed attribute values
 	data.ID = types.StringValue(userResp.ID)
 	data.Status = types.StringValue(userResp.Status.String())
+	data.AccessAll = types.BoolValue(userResp.AccessAll)
 	data.Type = types.StringValue(userResp.Type.String())
 
 	// Write logs using the tflog package
@@ -183,6 +193,7 @@ func (r *OrganizationUser) Read(ctx context.Context, req resource.ReadRequest, r
 	// Overwrite the model with the refreshed data
 	data.Email = types.StringValue(userResp.Email)
 	data.Status = types.StringValue(userResp.Status.String())
+	data.AccessAll = types.BoolValue(userResp.AccessAll)
 	data.Type = types.StringValue(userResp.Type.String())
 
 	// Save updated data into Terraform state
@@ -196,6 +207,31 @@ func (r *OrganizationUser) Update(ctx context.Context, req resource.UpdateReques
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Parse the type string into a UserOrgType (value will always be present due to schema default)
+	var userType models.UserOrgType
+	if err := userType.FromString(data.Type.ValueString()); err != nil {
+		resp.Diagnostics.AddError(
+			"Error parsing user type",
+			"Could not parse user type: "+err.Error(),
+		)
+		return
+	}
+
+	// Update the user if needed
+	user := models.OrganizationUserDetails{
+		Email:     data.Email.ValueString(),
+		Type:      userType,
+		AccessAll: data.AccessAll.ValueBool(),
+	}
+
+	if _, err := r.client.UpdateOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString(), user); err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating organization user",
+			"Could not update organization user with ID "+data.ID.ValueString()+": "+err.Error(),
+		)
 		return
 	}
 
@@ -253,5 +289,6 @@ func (r *OrganizationUser) ImportState(ctx context.Context, req resource.ImportS
 	// Map response body to schema and populate the rest of the attributes
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), userResp.Email)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("type"), userResp.Type.String())...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("access_all"), userResp.AccessAll)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("status"), userResp.Status.String())...)
 }

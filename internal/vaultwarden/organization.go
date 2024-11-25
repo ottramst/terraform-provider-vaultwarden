@@ -223,3 +223,13 @@ func (c *Client) DeleteOrganizationUser(ctx context.Context, userID, orgID strin
 
 	return nil
 }
+
+// UpdateOrganizationUser updates a user in an organization by their ID
+func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID string, user models.OrganizationUserDetails) (*models.OrganizationUserDetails, error) {
+	var userResp models.OrganizationUserDetails
+	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), user, &userResp); err != nil {
+		return nil, fmt.Errorf("failed to update organization user: %w", err)
+	}
+
+	return &userResp, nil
+}
