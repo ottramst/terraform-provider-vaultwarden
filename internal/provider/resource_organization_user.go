@@ -55,16 +55,23 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				Computed:            true,
 				MarkdownDescription: "ID of the invited user",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"organization_id": schema.StringAttribute{
 				MarkdownDescription: "ID of the organization to invite the user to",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "The email of the user to invite",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"type": schema.StringAttribute{
 				MarkdownDescription: "The role type of the user (Owner, Admin, User, Manager). Defaults to `User`",
@@ -86,6 +93,9 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				Computed:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("Revoked", "Invited", "Accepted", "Confirmed"),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},

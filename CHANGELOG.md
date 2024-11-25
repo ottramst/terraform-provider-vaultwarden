@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## v0.4.4
+
+* Fix issues with `vaultwarden_organization_user` resource attributes on update
+
 ## v0.4.3
 
 * Add `access_all` attribute to `vaultwarden_organization_user` resource
