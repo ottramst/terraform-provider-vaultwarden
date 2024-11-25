@@ -4,11 +4,14 @@ page_title: "vaultwarden_user Resource - vaultwarden"
 subcategory: ""
 description: |-
   This resource invites a user to the Vaultwarden server.
+  Requires admin_token to be set in the provider configuration.
 ---
 
 # vaultwarden_user (Resource)
 
 This resource invites a user to the Vaultwarden server.
+
+Requires `admin_token` to be set in the provider configuration.
 
 ## Example Usage
 

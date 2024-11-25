@@ -69,7 +69,6 @@ resource "vaultwarden_organization" "test" {
 resource "vaultwarden_organization_user" "test" {
 	organization_id = vaultwarden_organization.test.id
 	email           = %[6]q
-	type            = "User"
 }
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, orgName, email)
 }

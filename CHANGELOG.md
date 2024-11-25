@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## v0.4.1
+
+* Add `ResourceWithConfigure` to all resources
+* Make sure at least one type of authentication is set for the client
+* Fix bug where the `type` field was not being set on the `vaultwarden_organization_user` resource
+
 ## v0.4.0
 
 * Add `vaultwarden_account_register` resource
