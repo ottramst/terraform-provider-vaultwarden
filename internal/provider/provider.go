@@ -67,6 +67,7 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.AtLeastOneOf(path.Expressions{
+						path.MatchRoot("admin_token"),
 						path.MatchRoot("client_id"),
 						path.MatchRoot("client_secret"),
 					}...),
@@ -78,6 +79,7 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.AtLeastOneOf(path.Expressions{
+						path.MatchRoot("admin_token"),
 						path.MatchRoot("client_id"),
 						path.MatchRoot("client_secret"),
 					}...),

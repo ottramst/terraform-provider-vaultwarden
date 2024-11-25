@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## v0.4.2
+
+* Fix bug where all auth methods were being required for the client
+
 ## v0.4.1
 
 * Add `ResourceWithConfigure` to all resources
