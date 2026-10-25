@@ -1,5 +1,12 @@
 ## Unreleased
 
+FEATURES:
+
+* **New List Resource:** `vaultwarden_organization_user` - Find the members of an organization with `terraform query` (Terraform 1.14+), optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). `terraform query -generate-config-out` generates `import` blocks for them
+* **New List Resource:** `vaultwarden_organization_collection` - Find the collections of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_organization_group` - Find the groups of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_user` - Find the users of the server with `terraform query` and the admin API, optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+
 ENHANCEMENTS:
 
 * resource/vaultwarden_organization_user, resource/vaultwarden_organization_collection, resource/vaultwarden_organization_group, resource/vaultwarden_user: Support resource identity ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). In Terraform 1.12 and later, these resources can be imported with an `identity` (`organization_id` and `id`, or `id` for `vaultwarden_user`) in an `import` block. Import IDs keep working, and state written by earlier versions gets its identity on the next refresh, without changes
