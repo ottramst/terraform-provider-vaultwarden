@@ -45,3 +45,13 @@ resource "vaultwarden_account_register" "example" {
 ### Read-Only
 
 - `id` (String) ID of the registered account
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import vaultwarden_account_register.example <id>
+```
