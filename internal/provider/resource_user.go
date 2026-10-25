@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -19,6 +20,7 @@ import (
 var _ resource.Resource = &User{}
 var _ resource.ResourceWithConfigure = &User{}
 var _ resource.ResourceWithImportState = &User{}
+var _ resource.ResourceWithIdentity = &User{}
 
 func UserResource() resource.Resource {
 	return &User{}
@@ -64,6 +66,17 @@ func (r *User) Schema(ctx context.Context, req resource.SchemaRequest, resp *res
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
+			},
+		},
+	}
+}
+
+func (r *User) IdentitySchema(ctx context.Context, req resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"id": identityschema.StringAttribute{
+				Description:       "ID of the user",
+				RequiredForImport: true,
 			},
 		},
 	}
@@ -119,6 +132,7 @@ func (r *User) Create(ctx context.Context, req resource.CreateRequest, resp *res
 	enabled := data.Enabled.ValueBool()
 	data.Enabled = types.BoolValue(true)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setUserIdentity(ctx, resp.Identity, data.ID)...)
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -173,6 +187,7 @@ func (r *User) Read(ctx context.Context, req resource.ReadRequest, resp *resourc
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setUserIdentity(ctx, resp.Identity, data.ID)...)
 }
 
 func (r *User) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -199,6 +214,7 @@ func (r *User) Update(ctx context.Context, req resource.UpdateRequest, resp *res
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setUserIdentity(ctx, resp.Identity, data.ID)...)
 }
 
 func (r *User) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -222,5 +238,5 @@ func (r *User) Delete(ctx context.Context, req resource.DeleteRequest, resp *res
 }
 
 func (r *User) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughWithIdentity(ctx, path.Root("id"), path.Root("id"), req, resp)
 }

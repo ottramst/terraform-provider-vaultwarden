@@ -10,6 +10,22 @@ FEATURES:
 * **New Data Source:** `vaultwarden_item_secure_note` - Read a secure note item by ID ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
 * **New Ephemeral Resource:** `vaultwarden_item_login` - Read a login item by ID without saving its secrets in the plan or state (Terraform 1.10 and later) ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
 * **New Ephemeral Resource:** `vaultwarden_item_secure_note` - Read a secure note item by ID without saving it in the plan or state (Terraform 1.10 and later) ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
+* **New Ephemeral Resource:** `vaultwarden_organization_api_key` - Read an organization's API key (`client_id` and `client_secret`) for the public API and Directory Connector, without storing it in the plan or state. Requires Terraform 1.10 or later, and the `Owner` role on Vaultwarden 1.37 (1.36 also allows `Admin`) ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+* **New Ephemeral Resource:** `vaultwarden_user_api_key` - Read the provider user's personal API key without storing it in the plan or state ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+* **New Resource:** `vaultwarden_organization_api_key_rotation` - Rotate an organization's API key when the resource is created or its `triggers` change, for example on a `time_rotating` schedule. The new key is read with the `vaultwarden_organization_api_key` ephemeral resource ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+* **New List Resource:** `vaultwarden_organization_user` - Find the members of an organization with `terraform query` (Terraform 1.14+), optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). `terraform query -generate-config-out` generates `import` blocks for them
+* **New List Resource:** `vaultwarden_organization_collection` - Find the collections of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_organization_group` - Find the groups of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_user` - Find the users of the server with `terraform query` and the admin API, optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+
+ENHANCEMENTS:
+
+* resource/vaultwarden_organization_user, resource/vaultwarden_organization_collection, resource/vaultwarden_organization_group, resource/vaultwarden_user: Support resource identity ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). In Terraform 1.12 and later, these resources can be imported with an `identity` (`organization_id` and `id`, or `id` for `vaultwarden_user`) in an `import` block. Import IDs keep working, and state written by earlier versions gets its identity on the next refresh, without changes
+* resource/vaultwarden_account_register: New write-only `password_wo` attribute, with `password_wo_version`, to register an account without storing its password in the plan or state. Requires Terraform 1.11 or later. Exactly one of `password` and `password_wo` must be set; existing configurations with `password` keep working unchanged. Changing `password_wo_version` registers the account again, like changing `password`. Moving the same password from `password` to `password_wo` updates the state without replacing the account ([#58](https://github.com/ottramst/terraform-provider-vaultwarden/issues/58))
+
+BUG FIXES:
+
+* resource/vaultwarden_account_register: Setting `password` after an import no longer replaces the account. Any in-place update planned the account ID as unknown, which forced a replacement
 
 ## v0.6.0
 

@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -25,6 +26,7 @@ import (
 var _ provider.Provider = &VaultwardenProvider{}
 var _ provider.ProviderWithFunctions = &VaultwardenProvider{}
 var _ provider.ProviderWithEphemeralResources = &VaultwardenProvider{}
+var _ provider.ProviderWithListResources = &VaultwardenProvider{}
 
 // VaultwardenProvider defines the provider implementation.
 type VaultwardenProvider struct {
@@ -346,6 +348,7 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	resp.DataSourceData = client
 	resp.ResourceData = client
 	resp.EphemeralResourceData = client
+	resp.ListResourceData = client
 }
 
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
@@ -354,6 +357,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 		FolderResource,
 		ItemLoginResource,
 		ItemSecureNoteResource,
+		OrganizationAPIKeyRotationResource,
 		OrganizationCollectionResource,
 		OrganizationCollectionGroupResource,
 		OrganizationCollectionUserResource,
@@ -387,6 +391,17 @@ func (p *VaultwardenProvider) EphemeralResources(ctx context.Context) []func() e
 	return []func() ephemeral.EphemeralResource{
 		NewItemLoginEphemeralResource,
 		NewItemSecureNoteEphemeralResource,
+		NewOrganizationAPIKeyEphemeralResource,
+		NewUserAPIKeyEphemeralResource,
+	}
+}
+
+func (p *VaultwardenProvider) ListResources(ctx context.Context) []func() list.ListResource {
+	return []func() list.ListResource{
+		NewOrganizationCollectionListResource,
+		NewOrganizationGroupListResource,
+		NewOrganizationUserListResource,
+		NewUserListResource,
 	}
 }
 

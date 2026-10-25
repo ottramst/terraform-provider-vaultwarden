@@ -20,6 +20,7 @@ This provider includes:
 - **Collections**: Manage organization collections, with names encrypted client-side using the organization key
 - **Members & access**: Invite users to organizations with a role (`Owner`, `Admin`, `Manager`, `User`), and give them access to individual collections
 - **Server users** (admin API): Invite users to the server, and register accounts with a master password
+- **Adopting existing setups**: List resources for `terraform query` (Terraform 1.14+) find existing members, collections, groups and server users, and generate `import` blocks for them
 - **Authentication**: Log in with the master password or the user's personal API key, and use the admin token for `/admin` operations
 
 For the complete list of resources and data sources with detailed documentation, see the [docs/](docs/) directory.
@@ -98,6 +99,8 @@ For usage examples and comprehensive documentation, including all authentication
 - [Provider documentation](docs/index.md) for configuration details
 - [Resource documentation](docs/resources/) for available resources
 - [Data source documentation](docs/data-sources/) for available data sources
+- [Ephemeral resource documentation](docs/ephemeral-resources/) for secrets that are not stored in state (Terraform 1.10+)
+- [List resource documentation](docs/list-resources/) for `terraform query`
 - [Example configurations](examples/) for complete working examples
 
 ## Developing the Provider
