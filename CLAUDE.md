@@ -69,7 +69,7 @@ The tests register `test@example.com` on first use (`internal/vaultwarden/test/h
 - `Read()` removes the resource from state when the client returns `ErrNotFound`; deletes of already-deleted objects succeed
 - Errors use `resp.Diagnostics.AddError()` with title + detail
 
-**Composite IDs:** Organization-scoped resources import with slash-delimited IDs: `<org_id>/<id>` (`organization_collection`, `organization_group`, `organization_user`) and `<org_id>/<collection_id>/<organization_user_id>` (`organization_collection_user`), `<org_id>/<group_id>/<organization_user_id>` (`organization_group_member`).
+**Composite IDs:** Organization-scoped resources import with slash-delimited IDs: `<org_id>/<id>` (`organization_collection`, `organization_group`, `organization_user`), `<org_id>/<collection_id>/<organization_user_id>` (`organization_collection_user`), `<org_id>/<collection_id>/<group_id>` (`organization_collection_group`) and `<org_id>/<group_id>/<organization_user_id>` (`organization_group_member`).
 
 ## Test Patterns
 

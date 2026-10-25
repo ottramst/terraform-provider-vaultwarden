@@ -221,6 +221,80 @@ func (c *Client) RemoveOrganizationCollectionUser(ctx context.Context, orgID, co
 	return c.SetOrganizationCollectionAccess(ctx, orgID, colID, *access)
 }
 
+// GetOrganizationCollectionGroup returns the access of a group to a collection.
+func (c *Client) GetOrganizationCollectionGroup(ctx context.Context, orgID, colID, groupID string) (*models.CollectionAccess, error) {
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		if _, getErr := c.GetOrganizationCollection(ctx, orgID, colID); IsNotFound(getErr) {
+			return nil, getErr
+		}
+		return nil, err
+	}
+
+	for _, group := range access.Groups {
+		if group.ID == groupID {
+			return &group, nil
+		}
+	}
+
+	return nil, fmt.Errorf("group %s in collection %s: %w", groupID, colID, ErrNotFound)
+}
+
+// SetOrganizationCollectionGroup grants a group access to a collection, or changes it. The
+// access of other users and groups is preserved.
+func (c *Client) SetOrganizationCollectionGroup(ctx context.Context, orgID, colID string, groupAccess models.CollectionAccess) error {
+	defer c.lockOrganizationAccess(orgID)()
+
+	// Fails with ErrGroupsDisabled when groups are disabled. Vaultwarden 1.36 does not
+	// validate the groups sent.
+	if _, err := c.GetOrganizationGroup(ctx, orgID, groupAccess.ID); err != nil {
+		return err
+	}
+
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		return err
+	}
+
+	groups := []models.CollectionAccess{groupAccess}
+	for _, group := range access.Groups {
+		if group.ID != groupAccess.ID {
+			groups = append(groups, group)
+		}
+	}
+	access.Groups = groups
+
+	return c.SetOrganizationCollectionAccess(ctx, orgID, colID, *access)
+}
+
+// RemoveOrganizationCollectionGroup removes the access of a group to a collection. The access
+// of other users and groups is preserved.
+func (c *Client) RemoveOrganizationCollectionGroup(ctx context.Context, orgID, colID, groupID string) error {
+	defer c.lockOrganizationAccess(orgID)()
+
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		// Collection already deleted
+		if _, getErr := c.GetOrganizationCollection(ctx, orgID, colID); IsNotFound(getErr) {
+			return nil
+		}
+		return err
+	}
+
+	groups := []models.CollectionAccess{}
+	for _, group := range access.Groups {
+		if group.ID != groupID {
+			groups = append(groups, group)
+		}
+	}
+	if len(groups) == len(access.Groups) {
+		return nil
+	}
+	access.Groups = groups
+
+	return c.SetOrganizationCollectionAccess(ctx, orgID, colID, *access)
+}
+
 // DeleteOrganizationCollection deletes a collection from an organization.
 func (c *Client) DeleteOrganizationCollection(ctx context.Context, orgID, colID string) error {
 	if _, err := c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/organizations/%s/collections/%s", orgID, colID), nil, nil); err != nil {
