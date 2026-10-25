@@ -65,3 +65,4 @@ provider "vaultwarden" {
 - `client_secret` (String, Sensitive) The `client_secret` of the user's personal API key. Can also be set with the `VAULTWARDEN_CLIENT_SECRET` environment variable.
 - `email` (String) The email of the user to authenticate as. Can also be set with the `VAULTWARDEN_EMAIL` environment variable.
 - `master_password` (String, Sensitive) The master password of the user, used to log in and to decrypt the user's keys. Can also be set with the `VAULTWARDEN_MASTER_PASSWORD` environment variable.
+- `max_retry_wait` (Number) The total number of seconds a request waits for retries when Vaultwarden rate limits it (HTTP 429), for example when many provider instances log in from the same IP address. Retries back off exponentially. Set to `0` to disable retries. Defaults to `60`. Can also be set with the `VAULTWARDEN_MAX_RETRY_WAIT` environment variable.

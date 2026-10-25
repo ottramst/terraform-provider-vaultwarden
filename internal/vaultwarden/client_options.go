@@ -3,6 +3,7 @@ package vaultwarden
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // ClientOption defines a function type for configuring the Client.
@@ -63,6 +64,17 @@ func WithOAuth2Credentials(clientID, clientSecret string) ClientOption {
 	return func(c *Client) error {
 		c.Credentials.ClientID = clientID
 		c.Credentials.ClientSecret = clientSecret
+		return nil
+	}
+}
+
+// WithMaxRetryWait sets the total time a rate limited request waits for retries. Zero disables retries.
+func WithMaxRetryWait(wait time.Duration) ClientOption {
+	return func(c *Client) error {
+		if wait < 0 {
+			return fmt.Errorf("max retry wait cannot be negative")
+		}
+		c.maxRetryWait = wait
 		return nil
 	}
 }

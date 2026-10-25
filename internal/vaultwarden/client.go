@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,6 +48,11 @@ type Client struct {
 	authMu sync.Mutex
 	// orgMu guards AuthState.Organizations
 	orgMu sync.RWMutex
+
+	// maxRetryWait is the total time a request waits for retries when it is rate limited
+	maxRetryWait time.Duration
+	// retryBaseDelay is the wait before the first retry; it doubles on each retry
+	retryBaseDelay time.Duration
 
 	// accessLocks serializes changes to collection assignments per organization, see lockOrganizationAccess
 	accessLocksMu sync.Mutex
@@ -91,7 +98,9 @@ func New(endpoint string, opts ...ClientOption) (*Client, error) {
 			DeviceIdentifier: deviceID,
 			DeviceName:       DefaultDeviceName,
 		},
-		Credentials: &models.Credentials{},
+		Credentials:    &models.Credentials{},
+		maxRetryWait:   DefaultMaxRetryWait,
+		retryBaseDelay: time.Second,
 	}
 
 	// Apply any provided options
@@ -172,8 +181,60 @@ func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, re
 	return c.send(ctx, method, path, reqBody, respBody, requestOptions{authorize: c.authenticateRequest})
 }
 
-// send performs a request and decodes a JSON response into respBody, if set.
+// DefaultMaxRetryWait is the default total time a rate limited request waits for retries.
+const DefaultMaxRetryWait = time.Minute
+
+// maxRetryDelay caps the wait between two retries.
+const maxRetryDelay = 30 * time.Second
+
+// send performs a request and decodes a JSON response into respBody, if set. Rate limited
+// requests (HTTP 429) are retried with exponential backoff for up to maxRetryWait in total.
+// Vaultwarden sends no Retry-After header, so the wait is not taken from the response.
 func (c *Client) send(ctx context.Context, method, path string, reqBody, respBody interface{}, opts requestOptions) (*http.Response, error) {
+	delay := c.retryBaseDelay
+	var waited time.Duration
+
+	for {
+		resp, err := c.sendOnce(ctx, method, path, reqBody, respBody, opts)
+
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusTooManyRequests {
+			return resp, err
+		}
+
+		// Wait between half and all of the delay, so concurrent requests spread out
+		wait := delay/2 + time.Duration(rand.Int64N(int64(delay/2)+1))
+		if waited+wait > c.maxRetryWait {
+			return resp, fmt.Errorf("%w\n\nVaultwarden rate limited the request, and it still failed after waiting %s for retries. %s",
+				err, waited.Round(time.Second), rateLimitHint(apiErr.Body))
+		}
+
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return resp, err
+		case <-timer.C:
+		}
+		waited += wait
+		delay = min(delay*2, maxRetryDelay)
+	}
+}
+
+// rateLimitHint names the Vaultwarden settings of the rate limit that a 429 response body came from.
+func rateLimitHint(body string) string {
+	switch {
+	case strings.Contains(body, "Too many login requests"):
+		return "Raise the login rate limit (LOGIN_RATELIMIT_SECONDS, LOGIN_RATELIMIT_MAX_BURST) on the server, or reduce the number of provider instances logging in."
+	case strings.Contains(body, "<html"), strings.Contains(body, "<!DOCTYPE"):
+		return "Raise the admin rate limit (ADMIN_RATELIMIT_SECONDS, ADMIN_RATELIMIT_MAX_BURST) on the server."
+	default:
+		return "Raise the rate limit for unauthenticated requests (UNAUTHENTICATED_RATELIMIT_SECONDS, UNAUTHENTICATED_RATELIMIT_MAX_BURST) on the server."
+	}
+}
+
+// sendOnce performs a single attempt of a request, see send.
+func (c *Client) sendOnce(ctx context.Context, method, path string, reqBody, respBody interface{}, opts requestOptions) (*http.Response, error) {
 	// Prepare request body
 	bodyReader, contentType, err := prepareRequestBody(reqBody)
 	if err != nil {
