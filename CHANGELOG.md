@@ -5,6 +5,14 @@ FEATURES:
 * **New Ephemeral Resource:** `vaultwarden_organization_api_key` - Read an organization's API key (`client_id` and `client_secret`) for the public API and Directory Connector, without storing it in the plan or state. Requires Terraform 1.10 or later, and the `Owner` role on Vaultwarden 1.37 (1.36 also allows `Admin`) ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
 * **New Ephemeral Resource:** `vaultwarden_user_api_key` - Read the provider user's personal API key without storing it in the plan or state ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
 * **New Resource:** `vaultwarden_organization_api_key_rotation` - Rotate an organization's API key when the resource is created or its `triggers` change, for example on a `time_rotating` schedule. The new key is read with the `vaultwarden_organization_api_key` ephemeral resource ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+* **New List Resource:** `vaultwarden_organization_user` - Find the members of an organization with `terraform query` (Terraform 1.14+), optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). `terraform query -generate-config-out` generates `import` blocks for them
+* **New List Resource:** `vaultwarden_organization_collection` - Find the collections of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_organization_group` - Find the groups of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_user` - Find the users of the server with `terraform query` and the admin API, optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+
+ENHANCEMENTS:
+
+* resource/vaultwarden_organization_user, resource/vaultwarden_organization_collection, resource/vaultwarden_organization_group, resource/vaultwarden_user: Support resource identity ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). In Terraform 1.12 and later, these resources can be imported with an `identity` (`organization_id` and `id`, or `id` for `vaultwarden_user`) in an `import` block. Import IDs keep working, and state written by earlier versions gets its identity on the next refresh, without changes
 
 ## v0.6.0
 
