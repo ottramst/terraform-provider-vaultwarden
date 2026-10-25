@@ -52,22 +52,29 @@ func (p *VaultwardenProvider) Metadata(_ context.Context, _ provider.MetadataReq
 
 func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "The Vaultwarden provider allows you to interact with a Vaultwarden server.\n\n" +
+		MarkdownDescription: "Terraform provider for [Vaultwarden](https://github.com/dani-garcia/vaultwarden), " +
+			"an unofficial Bitwarden-compatible server. " +
 			"It supports and is tested against the latest two Vaultwarden minor releases, currently 1.36.x and 1.37.x; " +
 			"older Vaultwarden versions get best-effort support only, and the provider warns when it detects one.\n\n" +
-			"More information about authentication methods can be found in the [provider repository](https://github.com/ottramst/terraform-provider-vaultwarden#authentication)",
+			"The provider authenticates in up to two ways, which can be combined:\n\n" +
+			"- **As a user**, with `email` and `master_password`. Required for resources that act on behalf of a user, " +
+			"such as organizations and collections, because their data is encrypted client-side with the user's keys. " +
+			"If the user has two-step login enabled, also set the user's personal API key (`client_id` and `client_secret`).\n" +
+			"- **As the server admin**, with `admin_token`. Required for resources that use the `/admin` API, " +
+			"such as `vaultwarden_user` and `vaultwarden_account_register`. The admin page must be enabled on the server.\n\n" +
+			"Every attribute can also be set with an environment variable.",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "The endpoint of the Vaultwarden server",
+				MarkdownDescription: "The URL of the Vaultwarden server. Can also be set with the `VAULTWARDEN_ENDPOINT` environment variable.",
 				Required:            true,
 			},
 			"admin_token": schema.StringAttribute{
-				MarkdownDescription: "Token for admin page operations. This requires the `/admin` endpoint to be enabled.",
+				MarkdownDescription: "The admin token, for resources that use the `/admin` API. This requires the admin page to be enabled. Can also be set with the `VAULTWARDEN_ADMIN_TOKEN` environment variable.",
 				Sensitive:           true,
 				Optional:            true,
 			},
 			"email": schema.StringAttribute{
-				MarkdownDescription: "Email for API operations",
+				MarkdownDescription: "The email of the user to authenticate as. Can also be set with the `VAULTWARDEN_EMAIL` environment variable.",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.AtLeastOneOf(path.Expressions{
@@ -78,7 +85,7 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 				},
 			},
 			"master_password": schema.StringAttribute{
-				MarkdownDescription: "Master password for API operations",
+				MarkdownDescription: "The master password of the user, used to log in and to decrypt the user's keys. Can also be set with the `VAULTWARDEN_MASTER_PASSWORD` environment variable.",
 				Sensitive:           true,
 				Optional:            true,
 				Validators: []validator.String{
@@ -90,7 +97,7 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 				},
 			},
 			"client_id": schema.StringAttribute{
-				MarkdownDescription: "OAuth2 client ID for API key authentication",
+				MarkdownDescription: "The `client_id` of the user's personal API key, to log in with the API key instead of the master password, for example when two-step login is enabled. Requires `email` and `master_password`. Can also be set with the `VAULTWARDEN_CLIENT_ID` environment variable.",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(path.Expressions{
@@ -101,7 +108,7 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 				},
 			},
 			"client_secret": schema.StringAttribute{
-				MarkdownDescription: "OAuth2 client secret for API key authentication",
+				MarkdownDescription: "The `client_secret` of the user's personal API key. Can also be set with the `VAULTWARDEN_CLIENT_SECRET` environment variable.",
 				Sensitive:           true,
 				Optional:            true,
 				Validators: []validator.String{

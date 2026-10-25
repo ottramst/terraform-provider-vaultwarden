@@ -31,6 +31,9 @@ NOTES:
 * tests: Acceptance tests run against a `docker-compose.yml` Vaultwarden (`VW_VERSION` selects the version) and read the endpoint from `VAULTWARDEN_ENDPOINT`. `Makefile` was replaced by a `GNUmakefile` without the `docker-*` targets
 * build: The provider now requires Go 1.27 to build from source (Go 1.23 is end-of-life). Dependencies were updated, including `terraform-plugin-framework` v1.19.0 and `terraform-plugin-testing` v1.16.0
 * build: golangci-lint configuration migrated to v2, and golangci-lint is pinned to v2.15.0 in CI
+* ci: All actions are pinned to commit SHAs with least-privilege `permissions`, job timeouts and concurrency groups. CI also runs on pushes to `main`, adds a `go mod tidy` check, unit tests, and a single `CI gate` status check. New workflows: CodeQL, govulncheck and dependency review, OpenSSF Scorecard, and workflow linting (actionlint, zizmor). Releases now publish build provenance attestations
+* project: Added `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `CLAUDE.md`, issue forms and a pull request template, replaced the inherited HashiCorp code of conduct with the Contributor Covenant 2.1, and fixed `CODEOWNERS`
+* docs: The README follows the same structure as the other providers, and the authentication options and environment variables are now documented in the provider documentation
 
 ## v0.4.4
 
