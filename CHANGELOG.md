@@ -1,3 +1,9 @@
+## Unreleased
+
+FEATURES:
+
+* **New Resource:** `vaultwarden_organization_policy` - Manage organization policies, such as master password requirements, two-step login, single organization and disabling Send, with their settings as JSON ([#49](https://github.com/ottramst/terraform-provider-vaultwarden/issues/49))
+
 ## v0.5.1
 
 BUG FIXES:
