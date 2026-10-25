@@ -173,6 +173,52 @@ func LoginTestClient(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
+// RegisterAccount registers an account with the default KDF settings and returns a client
+// logged in as it. Registering an email that was invited to an organization accepts the
+// invitation when the server does not send mail, which is how the acceptance tests get
+// members into the Accepted status.
+func RegisterAccount(ctx context.Context, email, password string) (*vaultwarden.Client, error) {
+	client, err := vaultwarden.New(TestBaseURL, vaultwarden.WithUserCredentials(email, password))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	kdfConfig := models.DefaultKdfConfiguration()
+	preloginKey, err := keybuilder.BuildPreloginKey(password, email, kdfConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build prelogin key: %w", err)
+	}
+
+	encryptionKey, encryptedEncryptionKey, err := keybuilder.GenerateEncryptionKey(*preloginKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
+	}
+
+	publicKey, encryptedPrivateKey, err := keybuilder.GenerateEncryptedRSAKeyPair(*encryptionKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate RSA key pair: %w", err)
+	}
+
+	err = client.RegisterUser(ctx, vaultwarden.RegisterUserRequest{
+		Email:              email,
+		MasterPasswordHash: crypt.HashPassword(password, *preloginKey, false),
+		Key:                encryptedEncryptionKey,
+		Kdf:                kdfConfig.KdfType,
+		KdfIterations:      kdfConfig.KdfIterations,
+		KdfMemory:          kdfConfig.KdfMemory,
+		KdfParallelism:     kdfConfig.KdfParallelism,
+		Keys: models.KeyPair{
+			PublicKey:           publicKey,
+			EncryptedPrivateKey: encryptedPrivateKey,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
 // isUserExistsError checks if the error indicates the user already exists.
 func isUserExistsError(err error) bool {
 	return err != nil && (strings.Contains(err.Error(), "user already exists") ||
