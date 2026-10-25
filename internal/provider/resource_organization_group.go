@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -24,6 +22,7 @@ import (
 var _ resource.Resource = &OrganizationGroup{}
 var _ resource.ResourceWithConfigure = &OrganizationGroup{}
 var _ resource.ResourceWithImportState = &OrganizationGroup{}
+var _ resource.ResourceWithIdentity = &OrganizationGroup{}
 
 func OrganizationGroupResource() resource.Resource {
 	return &OrganizationGroup{}
@@ -96,6 +95,10 @@ func (r *OrganizationGroup) Schema(ctx context.Context, req resource.SchemaReque
 	}
 }
 
+func (r *OrganizationGroup) IdentitySchema(ctx context.Context, req resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = organizationObjectIdentitySchema("group")
+}
+
 func (r *OrganizationGroup) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
@@ -136,6 +139,7 @@ func (r *OrganizationGroup) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	data.ID = types.StringValue(group.ID)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 
 	tflog.Trace(ctx, fmt.Sprintf("created a new organization group with ID: %s", data.ID))
 
@@ -180,6 +184,7 @@ func (r *OrganizationGroup) Read(ctx context.Context, req resource.ReadRequest, 
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationGroup) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -213,6 +218,7 @@ func (r *OrganizationGroup) Update(ctx context.Context, req resource.UpdateReque
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationGroup) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -235,17 +241,7 @@ func (r *OrganizationGroup) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *OrganizationGroup) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	idParts := strings.Split(req.ID, "/")
-	if len(idParts) != 2 || idParts[0] == "" || idParts[1] == "" {
-		resp.Diagnostics.AddError(
-			"Invalid ID format",
-			"Expected import identifier with format: organization_id/group_id",
-		)
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_id"), idParts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), idParts[1])...)
+	importOrganizationObject(ctx, req, resp, "group_id")
 }
 
 // toGroup returns the group to send for data.

@@ -71,6 +71,8 @@ The tests register `test@example.com` on first use (`internal/vaultwarden/test/h
 
 **Composite IDs:** Organization-scoped resources import with slash-delimited IDs: `<org_id>/<id>` (`organization_collection`, `organization_group`, `organization_user`), `<org_id>/<collection_id>/<organization_user_id>` (`organization_collection_user`), `<org_id>/<collection_id>/<group_id>` (`organization_collection_group`) and `<org_id>/<group_id>/<organization_user_id>` (`organization_group_member`).
 
+**Resource identity** (`identity.go`): `organization_collection`, `organization_group` and `organization_user` implement `resource.ResourceWithIdentity` with the identity `organization_id` + `id` (the parts of their import ID), and `user` with `id`. Such a resource must set its identity in `Create`, `Read` and `Update` (`setOrganizationObjectIdentity`, `setUserIdentity`): the framework fails the operation when it is missing, and `Read` fills it in for state written before the resource had one. The identity must never change for an existing object. `ImportState` accepts both the import ID and the identity (`importOrganizationObject`). Changing an identity schema needs an identity upgrader and an upgrade test from the last release (`ExternalProviders`), like `TestAccResourceIdentityUpgradeFromV060`.
+
 ## Test Patterns
 
 Acceptance tests require a real Vaultwarden instance. Tests follow this structure:

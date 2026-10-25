@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
-	"strings"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -25,6 +24,7 @@ var _ resource.ResourceWithConfigure = &OrganizationUser{}
 var _ resource.ResourceWithImportState = &OrganizationUser{}
 var _ resource.ResourceWithValidateConfig = &OrganizationUser{}
 var _ resource.ResourceWithModifyPlan = &OrganizationUser{}
+var _ resource.ResourceWithIdentity = &OrganizationUser{}
 
 func OrganizationUserResource() resource.Resource {
 	return &OrganizationUser{}
@@ -126,6 +126,10 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 			},
 		},
 	}
+}
+
+func (r *OrganizationUser) IdentitySchema(ctx context.Context, req resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = organizationObjectIdentitySchema("organization user")
 }
 
 func (r *OrganizationUser) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -278,6 +282,7 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 	plan := data
 	setOrganizationUserState(&data, userResp)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 
 	tflog.Trace(ctx, fmt.Sprintf("created a new user_invite with ID: %s", data.ID))
 
@@ -383,6 +388,7 @@ func (r *OrganizationUser) Read(ctx context.Context, req resource.ReadRequest, r
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationUser) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -447,6 +453,7 @@ func (r *OrganizationUser) Update(ctx context.Context, req resource.UpdateReques
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationUser) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -470,21 +477,10 @@ func (r *OrganizationUser) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 func (r *OrganizationUser) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	idParts := strings.Split(req.ID, "/")
-	if len(idParts) != 2 {
-		resp.Diagnostics.AddError(
-			"Invalid ID format",
-			"Expected import identifier with format: organization_id/user_id",
-		)
+	organizationID, userID, ok := importOrganizationObject(ctx, req, resp, "user_id")
+	if !ok {
 		return
 	}
-
-	organizationID := idParts[0]
-	userID := idParts[1]
-
-	// Set the organization_id and id attributes
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_id"), organizationID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), userID)...)
 
 	// After setting the IDs, fetch the current state of the resource
 	userResp, err := r.client.GetOrganizationUser(ctx, userID, organizationID)
