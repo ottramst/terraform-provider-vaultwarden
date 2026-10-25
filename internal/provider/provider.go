@@ -350,6 +350,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 		AccountRegisterResource,
 		OrganizationCollectionResource,
 		OrganizationCollectionUserResource,
+		OrganizationGroupMemberResource,
 		OrganizationGroupResource,
 		OrganizationPolicyResource,
 		OrganizationResource,

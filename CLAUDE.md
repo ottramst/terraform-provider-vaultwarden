@@ -58,7 +58,7 @@ The tests register `test@example.com` on first use (`internal/vaultwarden/test/h
 - Organization keys are decrypted at login from the profile and cached; read them with `Client.OrganizationSecret(orgID)`. Collection names are encrypted with the organization key (`crypt`, `encryptedstring`, `keybuilder`, `symmetrickey` packages).
 - Requests go through `send()` (`client.go`), which retries rate limited requests (HTTP 429) with exponential backoff for up to `max_retry_wait` (default 60s); Vaultwarden sends no `Retry-After` header, and the final error names the server setting of the limiter that fired. Non-2xx responses return an `*APIError`. Methods map Vaultwarden's not-found responses to a wrapped `ErrNotFound` (`IsNotFound(err)`); they differ per object: a JSON 404 for admin users, a 400 for organization members, a missing list entry for collections, a 400 with "Group not found" for groups, and a generic 401 for a deleted organization, confirmed against the user's profile (`organizationGone`).
 - Vaultwarden's endpoints for collection and member assignments replace all assignments. Updates read the current assignments and send them back, and all writes to assignments in an organization are serialized with `lockOrganizationAccess(orgID)`. Collection access is written with `POST /collections/bulk-access`; the per-collection user endpoints were removed in Vaultwarden 1.36.
-- Groups need `ORG_GROUPS_ENABLED=true` on the server (set in `docker-compose.yml`); otherwise group endpoints answer 400 "Group support is disabled" (`ErrGroupsDisabled`), and list endpoints return no groups. The group `PUT` replaces the group's collections and members, and ignores `externalId`. Vaultwarden 1.37 no longer returns a group's `accessAll`.
+- Groups need `ORG_GROUPS_ENABLED=true` on the server (set in `docker-compose.yml`); otherwise group endpoints answer 400 "Group support is disabled" (`ErrGroupsDisabled`), and list endpoints return no groups. The group `PUT` replaces the group's collections and members, and ignores `externalId`. Vaultwarden 1.37 no longer returns a group's `accessAll`, so group members are changed with the member `PUT` (`setOrganizationUserGroups`), not the group `PUT`; 1.37 also removed `PUT /groups/{id}/users`.
 - Vaultwarden 1.34+ derives a member's `access_all` from the role, and 1.37.4 no longer returns it: use `OrganizationUserDetails.HasAccessAll()`. Managers are returned as the custom role (type 4).
 
 **Resource pattern** (all files in `internal/provider/`):
@@ -69,7 +69,7 @@ The tests register `test@example.com` on first use (`internal/vaultwarden/test/h
 - `Read()` removes the resource from state when the client returns `ErrNotFound`; deletes of already-deleted objects succeed
 - Errors use `resp.Diagnostics.AddError()` with title + detail
 
-**Composite IDs:** Organization-scoped resources import with slash-delimited IDs: `<org_id>/<id>` (`organization_collection`, `organization_group`, `organization_user`) and `<org_id>/<collection_id>/<organization_user_id>` (`organization_collection_user`).
+**Composite IDs:** Organization-scoped resources import with slash-delimited IDs: `<org_id>/<id>` (`organization_collection`, `organization_group`, `organization_user`) and `<org_id>/<collection_id>/<organization_user_id>` (`organization_collection_user`), `<org_id>/<group_id>/<organization_user_id>` (`organization_group_member`).
 
 ## Test Patterns
 
