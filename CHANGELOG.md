@@ -1,3 +1,9 @@
+## Unreleased
+
+BUG FIXES:
+
+* resource/vaultwarden_account_register: New accounts are registered with the default KDF settings (PBKDF2-SHA256, 600,000 iterations). They used to be taken from a prelogin of the provider user's email, which has no account when the provider is configured with only `admin_token`. Vaultwarden 1.37 answers such a prelogin with decoy settings, so registration could fail with "PBKDF2 KDF iterations must be at least 100000", or create the account with weak settings such as Argon2id with 3 iterations
+
 ## v0.5.0
 
 BREAKING CHANGES:

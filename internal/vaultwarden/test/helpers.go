@@ -101,6 +101,15 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	}
 	t.Log("User does not exist")
 
+	// For an email without an account the prelogin KDF settings are decoys, so register
+	// with the default ones
+	kdfConfig = models.DefaultKdfConfiguration()
+	preloginKey, err = keybuilder.BuildPreloginKey(TestPassword, TestEmail, kdfConfig)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to build prelogin key: %w", err)
+	}
+	hashedPw = crypt.HashPassword(TestPassword, *preloginKey, false)
+
 	// Create encryption key
 	encryptionKey, encryptedEncryptionKey, err := keybuilder.GenerateEncryptionKey(*preloginKey)
 	if err != nil {

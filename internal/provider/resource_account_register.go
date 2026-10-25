@@ -122,23 +122,8 @@ func (r *AccountRegister) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	// Do prelogin to get KDF parameters
-	preloginResp, err := r.client.PreLogin(ctx)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error prelogin",
-			"Could not prelogin, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// Build the KDF configuration
-	kdfConfig := &models.KdfConfiguration{
-		KdfType:        preloginResp.Kdf,
-		KdfIterations:  preloginResp.KdfIterations,
-		KdfMemory:      preloginResp.KdfMemory,
-		KdfParallelism: preloginResp.KdfParallelism,
-	}
+	// New accounts use the default KDF settings
+	kdfConfig := models.DefaultKdfConfiguration()
 
 	// Build prelogin key
 	preloginKey, err := keybuilder.BuildPreloginKey(data.Password.ValueString(), data.Email.ValueString(), kdfConfig)
