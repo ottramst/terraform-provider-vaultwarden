@@ -1,4 +1,4 @@
-name: Test
+name: Tests
 
 on:
   workflow_call:
@@ -10,50 +10,38 @@ jobs:
   test:
     name: Terraform Provider Acceptance Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
-      VAULTWARDEN_ADMIN_TOKEN: admin_token
-      VAULTWARDEN_EMAIL: test@example.com
-      VAULTWARDEN_MASTER_PASSWORD: test-password-123!
-    services:
-      vaultwarden:
-        image: vaultwarden/server:${{ matrix.vaultwarden_version }}-alpine
-        env:
-          ROCKET_PORT: "8000"
-          ADMIN_TOKEN: ${{ env.VAULTWARDEN_ADMIN_TOKEN }}
-          ADMIN_RATELIMIT_MAX_BURST: "1000"
-          ADMIN_RATELIMIT_SECONDS: "10"
-          LOGIN_RATELIMIT_MAX_BURST: "1000"
-          LOGIN_RATELIMIT_SECONDS: "10"
-        ports:
-          - 8000:8000
-        volumes:
-          - /tmp/vaultwarden:/data
-        options: --health-cmd="curl --fail http://localhost:8000/alive" --health-interval=10s --health-timeout=5s --health-retries=3
+      VAULTWARDEN_ENDPOINT: http://localhost:8000
+      # VW_VERSION selects the docker-compose.yml image tag.
+      VW_VERSION: ${{ matrix.vaultwarden-version }}
     strategy:
       fail-fast: false
       matrix:
-        terraform_version:
-          - '1.8.*'
-          - '1.9.*'
-        vaultwarden_version:
-          - 1.32.5
-          - 1.31.0
-          - 1.30.5
-          - 1.29.2
-          - 1.28.1
+        # Only the latest two Vaultwarden minor releases are tested (latest
+        # patch of each). Older versions get best-effort support only (see
+        # README). Keep the default in docker-compose.yml in sync.
+        vaultwarden-version:
+          - '1.36.0'
+          - '1.37.4'
+        # Only non-EOL Terraform releases: HashiCorp supports the two newest
+        # minor versions, so drop the oldest entry when a new minor ships.
+        terraform-version:
+          - '1.16.*'
+          - '1.17.*'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+          cache: true
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
+          terraform_version: ${{ matrix.terraform-version }}
           terraform_wrapper: false
-          terraform_version: ${{ matrix.terraform_version }}
-      - name: Get dependencies
-        run: make vendor
-      - name: Terraform Acceptance Tests
-        timeout-minutes: 10
-        env:
-          VW_TEST_URL: http://localhost:8000
-        run: make testacc
+      - name: Start Vaultwarden
+        run: docker compose up -d --wait
+      - run: go mod download
+      - run: make testacc

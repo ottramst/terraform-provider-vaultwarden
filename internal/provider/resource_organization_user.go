@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -23,6 +22,8 @@ import (
 var _ resource.Resource = &OrganizationUser{}
 var _ resource.ResourceWithConfigure = &OrganizationUser{}
 var _ resource.ResourceWithImportState = &OrganizationUser{}
+var _ resource.ResourceWithValidateConfig = &OrganizationUser{}
+var _ resource.ResourceWithModifyPlan = &OrganizationUser{}
 
 func OrganizationUserResource() resource.Resource {
 	return &OrganizationUser{}
@@ -83,10 +84,13 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				},
 			},
 			"access_all": schema.BoolAttribute{
-				MarkdownDescription: "Whether the user has access to all collections in the organization. Defaults to `false`",
-				Computed:            true,
-				Optional:            true,
-				Default:             booldefault.StaticBool(false),
+				MarkdownDescription: "Whether the user has access to all collections in the organization. " +
+					"`Owner` and `Admin` users always have access to all collections. " +
+					"For `Manager` users it can be set to `true` (the *Manage all collections* permission). " +
+					"`User` users cannot have it; grant them access to individual collections instead. " +
+					"Defaults to `true` for `Owner` and `Admin`, and `false` otherwise.",
+				Computed: true,
+				Optional: true,
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "The status of the user",
@@ -122,6 +126,58 @@ func (r *OrganizationUser) Configure(ctx context.Context, req resource.Configure
 	r.client = client
 }
 
+func (r *OrganizationUser) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data OrganizationUserModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() || data.AccessAll.IsNull() || data.AccessAll.IsUnknown() || data.Type.IsUnknown() {
+		return
+	}
+
+	userType := data.Type.ValueString()
+	if data.Type.IsNull() {
+		userType = "User"
+	}
+
+	switch {
+	case userType == "User" && data.AccessAll.ValueBool():
+		resp.Diagnostics.AddAttributeError(
+			path.Root("access_all"),
+			"Invalid access_all for User",
+			"Vaultwarden does not allow users of type User to have access to all collections. "+
+				"Use type Manager with access_all, or grant access to individual collections.",
+		)
+	case (userType == "Owner" || userType == "Admin") && !data.AccessAll.ValueBool():
+		resp.Diagnostics.AddAttributeError(
+			path.Root("access_all"),
+			"Invalid access_all for "+userType,
+			"Vaultwarden always gives users of type "+userType+" access to all collections. "+
+				"Remove access_all or set it to true.",
+		)
+	}
+}
+
+func (r *OrganizationUser) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Nothing to do on destroy
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var config, plan OrganizationUserModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+
+	if resp.Diagnostics.HasError() || !config.AccessAll.IsNull() || plan.Type.IsUnknown() {
+		return
+	}
+
+	// Without an explicit value, access_all follows from the type
+	userType := plan.Type.ValueString()
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("access_all"), userType == "Owner" || userType == "Admin")...)
+}
+
 func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data OrganizationUserModel
 
@@ -143,9 +199,11 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	// Call the client method to invite the user
+	requestType, permissions := vaultwarden.OrganizationUserRole(userType, data.AccessAll.ValueBool())
 	inviteReq := vaultwarden.InviteOrganizationUserRequest{
-		Type:      userType,
-		AccessAll: data.AccessAll.ValueBool(),
+		Type:        requestType,
+		AccessAll:   data.AccessAll.ValueBool(),
+		Permissions: permissions,
 	}
 
 	if err := r.client.InviteOrganizationUser(ctx, inviteReq, data.Email.ValueString(), data.OrganizationID.ValueString()); err != nil {
@@ -169,7 +227,7 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 	// Map response body to schema and populate Computed attribute values
 	data.ID = types.StringValue(userResp.ID)
 	data.Status = types.StringValue(userResp.Status.String())
-	data.AccessAll = types.BoolValue(userResp.AccessAll)
+	data.AccessAll = types.BoolValue(userResp.HasAccessAll())
 	data.Type = types.StringValue(userResp.Type.String())
 
 	// Write logs using the tflog package
@@ -203,7 +261,7 @@ func (r *OrganizationUser) Read(ctx context.Context, req resource.ReadRequest, r
 	// Overwrite the model with the refreshed data
 	data.Email = types.StringValue(userResp.Email)
 	data.Status = types.StringValue(userResp.Status.String())
-	data.AccessAll = types.BoolValue(userResp.AccessAll)
+	data.AccessAll = types.BoolValue(userResp.HasAccessAll())
 	data.Type = types.StringValue(userResp.Type.String())
 
 	// Save updated data into Terraform state
@@ -230,20 +288,35 @@ func (r *OrganizationUser) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	// Update the user if needed
-	user := models.OrganizationUserDetails{
-		Email:     data.Email.ValueString(),
-		Type:      userType,
-		AccessAll: data.AccessAll.ValueBool(),
+	// Update the user
+	requestType, permissions := vaultwarden.OrganizationUserRole(userType, data.AccessAll.ValueBool())
+	updateReq := vaultwarden.UpdateOrganizationUserRequest{
+		Type:        requestType,
+		AccessAll:   data.AccessAll.ValueBool(),
+		Permissions: permissions,
 	}
 
-	if _, err := r.client.UpdateOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString(), user); err != nil {
+	if err := r.client.UpdateOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString(), updateReq); err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating organization user",
 			"Could not update organization user with ID "+data.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
+
+	// Read back what the server applied
+	userResp, err := r.client.GetOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching organization user",
+			"Could not fetch organization user, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	data.Status = types.StringValue(userResp.Status.String())
+	data.AccessAll = types.BoolValue(userResp.HasAccessAll())
+	data.Type = types.StringValue(userResp.Type.String())
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -299,6 +372,6 @@ func (r *OrganizationUser) ImportState(ctx context.Context, req resource.ImportS
 	// Map response body to schema and populate the rest of the attributes
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), userResp.Email)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("type"), userResp.Type.String())...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("access_all"), userResp.AccessAll)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("access_all"), userResp.HasAccessAll())...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("status"), userResp.Status.String())...)
 }

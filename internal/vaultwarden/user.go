@@ -21,9 +21,38 @@ type RegisterUserRequest struct {
 	Keys               models.KeyPair `json:"keys"`
 }
 
+// registerVerificationRequest is the request body for starting a registration.
+type registerVerificationRequest struct {
+	Email string `json:"email"`
+	Name  string `json:"name,omitempty"`
+}
+
+// registerFinishRequest is the request body for completing a registration.
+type registerFinishRequest struct {
+	RegisterUserRequest
+	EmailVerificationToken string `json:"emailVerificationToken"`
+}
+
 // RegisterUser registers a new user.
+//
+// Registration is a two-step flow: the server first issues an email verification
+// token, which is then used to finish the registration. The legacy single-step
+// /api/accounts/register endpoint was removed in Vaultwarden 1.36.0.
 func (c *Client) RegisterUser(ctx context.Context, req RegisterUserRequest) error {
-	if _, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/api/accounts/register", req, nil); err != nil {
+	var token string
+	verifyReq := registerVerificationRequest{Email: req.Email, Name: req.Name}
+	if _, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/identity/accounts/register/send-verification-email", verifyReq, &token); err != nil {
+		return fmt.Errorf("failed to register user: %w", err)
+	}
+
+	// With SMTP configured and SIGNUPS_VERIFY enabled, the token is emailed to the
+	// user instead of being returned, so the registration cannot be completed here.
+	if token == "" {
+		return fmt.Errorf("failed to register user: the server requires email verification for new accounts (SIGNUPS_VERIFY), which this provider cannot complete")
+	}
+
+	finishReq := registerFinishRequest{RegisterUserRequest: req, EmailVerificationToken: token}
+	if _, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/identity/accounts/register/finish", finishReq, nil); err != nil {
 		return fmt.Errorf("failed to register user: %w", err)
 	}
 
@@ -65,7 +94,7 @@ func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 		return fmt.Errorf("user ID is required")
 	}
 
-	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/admin/users/%s/delete", ID), nil, nil); err != nil {
+	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/admin/users/%s/delete", ID), struct{}{}, nil); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 

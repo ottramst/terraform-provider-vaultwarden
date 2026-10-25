@@ -34,7 +34,7 @@ resource "vaultwarden_organization_user" "example" {
 
 ### Optional
 
-- `access_all` (Boolean) Whether the user has access to all collections in the organization. Defaults to `false`
+- `access_all` (Boolean) Whether the user has access to all collections in the organization. `Owner` and `Admin` users always have access to all collections. For `Manager` users it can be set to `true` (the *Manage all collections* permission). `User` users cannot have it; grant them access to individual collections instead. Defaults to `true` for `Owner` and `Admin`, and `false` otherwise.
 - `type` (String) The role type of the user (Owner, Admin, User, Manager). Defaults to `User`
 
 ### Read-Only

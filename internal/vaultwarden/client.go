@@ -134,6 +134,7 @@ func (c *Client) doUnauthenticatedRequest(ctx context.Context, method, path stri
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	req.Header.Set("Accept", "application/json")
 
 	// Send request
 	resp, err := c.httpClient.Do(req)
@@ -185,6 +186,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, re
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	req.Header.Set("Accept", "application/json")
 
 	// Add authentication to request
 	if err := c.authenticateRequest(req); err != nil {

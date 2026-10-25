@@ -27,14 +27,14 @@ var (
 	TestBaseURL     = GetTestBaseURL()
 )
 
-// GetTestBaseURL returns the base URL for the Vaultwarden instance
-// It can be configured via the VW_TEST_URL environment variable.
+// GetTestBaseURL returns the base URL for the Vaultwarden instance.
+// It can be configured via the VAULTWARDEN_ENDPOINT environment variable and
+// defaults to the docker-compose.yml instance.
 func GetTestBaseURL() string {
-	if url := os.Getenv("VW_TEST_URL"); url != "" {
+	if url := os.Getenv("VAULTWARDEN_ENDPOINT"); url != "" {
 		return url
 	}
-	// Default to docker service name when running in container
-	return "http://tf-vaultwarden:8000"
+	return "http://localhost:8000"
 }
 
 // GetTestClient returns a singleton test client, creating it if necessary.
