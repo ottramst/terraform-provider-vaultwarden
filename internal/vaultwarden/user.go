@@ -110,6 +110,28 @@ func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 	return nil
 }
 
+// SetUserEnabled enables or disables a user. Disabling a user also logs them out of all their
+// devices. The admin POST routes of Vaultwarden 1.37+ require a JSON body.
+func (c *Client) SetUserEnabled(ctx context.Context, ID string, enabled bool) error {
+	if ID == "" {
+		return fmt.Errorf("user ID is required")
+	}
+
+	action := "disable"
+	if enabled {
+		action = "enable"
+	}
+
+	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/admin/users/%s/%s", ID, action), struct{}{}, nil); err != nil {
+		if isUserNotFound(err) {
+			return fmt.Errorf("user %s: %w", ID, ErrNotFound)
+		}
+		return fmt.Errorf("failed to %s user: %w", action, err)
+	}
+
+	return nil
+}
+
 // isUserNotFound reports whether err is the admin API's answer for a user that does not exist.
 // An unknown route is also a 404, but with an HTML page instead of a JSON error.
 func isUserNotFound(err error) bool {

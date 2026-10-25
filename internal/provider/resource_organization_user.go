@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -41,6 +42,8 @@ type OrganizationUserModel struct {
 	Email          types.String `tfsdk:"email"`
 	Type           types.String `tfsdk:"type"`
 	AccessAll      types.Bool   `tfsdk:"access_all"`
+	AutoConfirm    types.Bool   `tfsdk:"auto_confirm"`
+	Revoked        types.Bool   `tfsdk:"revoked"`
 	Status         types.String `tfsdk:"status"`
 }
 
@@ -93,8 +96,26 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				Computed: true,
 				Optional: true,
 			},
+			"auto_confirm": schema.BoolAttribute{
+				MarkdownDescription: "Whether to confirm the user once they have accepted the invitation. " +
+					"Until a user is confirmed, they cannot decrypt the organization's items. " +
+					"Confirming encrypts the organization key with the user's public key, which Vaultwarden only allows after the user accepted the invitation. " +
+					"When the user has accepted, the plan shows `status` as changing and the apply confirms them; while they are still `Invited`, nothing changes. " +
+					"Setting it to `false` does not unconfirm a confirmed user. Defaults to `false`.",
+				Computed: true,
+				Optional: true,
+				Default:  booldefault.StaticBool(false),
+			},
+			"revoked": schema.BoolAttribute{
+				MarkdownDescription: "Whether the user's access to the organization is revoked. " +
+					"A revoked user stays in the organization but cannot access its items; restoring them (`false`) brings back the status they had before. " +
+					"Defaults to `false`.",
+				Computed: true,
+				Optional: true,
+				Default:  booldefault.StaticBool(false),
+			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "The status of the user",
+				MarkdownDescription: "The status of the user: `Invited`, `Accepted`, `Confirmed` or `Revoked`",
 				Computed:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("Revoked", "Invited", "Accepted", "Confirmed"),
@@ -170,13 +191,39 @@ func (r *OrganizationUser) ModifyPlan(ctx context.Context, req resource.ModifyPl
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
-	if resp.Diagnostics.HasError() || !config.AccessAll.IsNull() || plan.Type.IsUnknown() {
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Without an explicit value, access_all follows from the type
-	userType := plan.Type.ValueString()
-	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("access_all"), userType == "Owner" || userType == "Admin")...)
+	if config.AccessAll.IsNull() && !plan.Type.IsUnknown() {
+		userType := plan.Type.ValueString()
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("access_all"), userType == "Owner" || userType == "Admin")...)
+	}
+
+	// The status is unknown on create anyway
+	if req.State.Raw.IsNull() {
+		return
+	}
+
+	var state OrganizationUserModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The status changes when the user is revoked or restored, or when an accepted user is
+	// confirmed. Planning it as unknown also makes a user that accepted the invitation since
+	// the last apply show up as a change, so that the next apply confirms them.
+	if !plan.Revoked.Equal(state.Revoked) || (shouldConfirm(plan) && state.Status.ValueString() == "Accepted") {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("status"), types.StringUnknown())...)
+	}
+}
+
+// shouldConfirm reports whether the plan may confirm the user once they have accepted. A
+// revoked user cannot be confirmed; they are confirmed once restored.
+func shouldConfirm(plan OrganizationUserModel) bool {
+	return (plan.AutoConfirm.IsUnknown() || plan.AutoConfirm.ValueBool()) && !plan.Revoked.ValueBool()
 }
 
 func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -225,18 +272,79 @@ func (r *OrganizationUser) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	// Map response body to schema and populate Computed attribute values
+	// Map response body to schema and populate Computed attribute values. The state is saved
+	// before confirming or revoking, so that a failure there leaves the user tracked (tainted).
 	data.ID = types.StringValue(userResp.ID)
-	data.Status = types.StringValue(userResp.Status.String())
-	data.AccessAll = types.BoolValue(userResp.HasAccessAll())
-	data.Type = types.StringValue(userResp.Type.String())
+	plan := data
+	setOrganizationUserState(&data, userResp)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
 	tflog.Trace(ctx, fmt.Sprintf("created a new user_invite with ID: %s", data.ID))
 
-	// Save data into Terraform state
+	// An existing account is accepted right away when the server does not send mail
+	userResp, err = r.reconcileStatus(ctx, plan, userResp)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating organization user status",
+			"Could not update the status of organization user with ID "+data.ID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	setOrganizationUserState(&data, userResp)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// setOrganizationUserState copies the server's view of the user, except the email, into the model.
+func setOrganizationUserState(data *OrganizationUserModel, user *models.OrganizationUserDetails) {
+	data.Status = types.StringValue(user.Status.String())
+	data.Revoked = types.BoolValue(user.Status == models.UserOrgStatusRevoked)
+	data.AccessAll = types.BoolValue(user.HasAccessAll())
+	data.Type = types.StringValue(user.Type.String())
+}
+
+// reconcileStatus restores or revokes the user to match the plan, and confirms them when
+// auto_confirm is set and they have accepted the invitation. It returns the user as the server
+// has them afterwards.
+func (r *OrganizationUser) reconcileStatus(ctx context.Context, plan OrganizationUserModel, user *models.OrganizationUserDetails) (*models.OrganizationUserDetails, error) {
+	// The status may only change when the plan expects it to (see ModifyPlan). A user that
+	// accepted after a saved plan was made is confirmed by the next plan and apply.
+	if !plan.Status.IsUnknown() {
+		return user, nil
+	}
+
+	userID, orgID := plan.ID.ValueString(), plan.OrganizationID.ValueString()
+	revoke := plan.Revoked.ValueBool()
+
+	refresh := func(err error) (*models.OrganizationUserDetails, error) {
+		if err != nil {
+			return nil, err
+		}
+		return r.client.GetOrganizationUser(ctx, userID, orgID)
+	}
+
+	var err error
+
+	// A restored user gets back the status they had before they were revoked
+	if !revoke && user.Status == models.UserOrgStatusRevoked {
+		if user, err = refresh(r.client.RestoreOrganizationUser(ctx, userID, orgID)); err != nil {
+			return nil, err
+		}
+	}
+
+	if shouldConfirm(plan) && user.Status == models.UserOrgStatusAccepted {
+		if user, err = refresh(r.client.ConfirmOrganizationUser(ctx, userID, orgID)); err != nil {
+			return nil, err
+		}
+	}
+
+	if revoke && user.Status != models.UserOrgStatusRevoked {
+		if user, err = refresh(r.client.RevokeOrganizationUser(ctx, userID, orgID)); err != nil {
+			return nil, err
+		}
+	}
+
+	return user, nil
 }
 
 func (r *OrganizationUser) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -266,48 +374,54 @@ func (r *OrganizationUser) Read(ctx context.Context, req resource.ReadRequest, r
 
 	// Overwrite the model with the refreshed data
 	data.Email = types.StringValue(userResp.Email)
-	data.Status = types.StringValue(userResp.Status.String())
-	data.AccessAll = types.BoolValue(userResp.HasAccessAll())
-	data.Type = types.StringValue(userResp.Type.String())
+	setOrganizationUserState(&data, userResp)
+
+	// State written by provider versions before auto_confirm existed has no value for it
+	if data.AutoConfirm.IsNull() {
+		data.AutoConfirm = types.BoolValue(false)
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *OrganizationUser) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data OrganizationUserModel
+	var data, state OrganizationUserModel
 
-	// Read Terraform plan data into the model
+	// Read Terraform plan and prior state data into the models
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Parse the type string into a UserOrgType (value will always be present due to schema default)
-	var userType models.UserOrgType
-	if err := userType.FromString(data.Type.ValueString()); err != nil {
-		resp.Diagnostics.AddError(
-			"Error parsing user type",
-			"Could not parse user type: "+err.Error(),
-		)
-		return
-	}
+	// Update the role, unless only the status changes
+	if !data.Type.Equal(state.Type) || !data.AccessAll.Equal(state.AccessAll) {
+		// Parse the type string into a UserOrgType (value will always be present due to schema default)
+		var userType models.UserOrgType
+		if err := userType.FromString(data.Type.ValueString()); err != nil {
+			resp.Diagnostics.AddError(
+				"Error parsing user type",
+				"Could not parse user type: "+err.Error(),
+			)
+			return
+		}
 
-	// Update the user
-	requestType, permissions := vaultwarden.OrganizationUserRole(userType, data.AccessAll.ValueBool())
-	updateReq := vaultwarden.UpdateOrganizationUserRequest{
-		Type:        requestType,
-		AccessAll:   data.AccessAll.ValueBool(),
-		Permissions: permissions,
-	}
+		requestType, permissions := vaultwarden.OrganizationUserRole(userType, data.AccessAll.ValueBool())
+		updateReq := vaultwarden.UpdateOrganizationUserRequest{
+			Type:        requestType,
+			AccessAll:   data.AccessAll.ValueBool(),
+			Permissions: permissions,
+		}
 
-	if err := r.client.UpdateOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString(), updateReq); err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating organization user",
-			"Could not update organization user with ID "+data.ID.ValueString()+": "+err.Error(),
-		)
-		return
+		if err := r.client.UpdateOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString(), updateReq); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating organization user",
+				"Could not update organization user with ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Read back what the server applied
@@ -320,9 +434,16 @@ func (r *OrganizationUser) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	data.Status = types.StringValue(userResp.Status.String())
-	data.AccessAll = types.BoolValue(userResp.HasAccessAll())
-	data.Type = types.StringValue(userResp.Type.String())
+	userResp, err = r.reconcileStatus(ctx, data, userResp)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating organization user status",
+			"Could not update the status of organization user with ID "+data.ID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	setOrganizationUserState(&data, userResp)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -380,4 +501,6 @@ func (r *OrganizationUser) ImportState(ctx context.Context, req resource.ImportS
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("type"), userResp.Type.String())...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("access_all"), userResp.HasAccessAll())...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("status"), userResp.Status.String())...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("revoked"), userResp.Status == models.UserOrgStatusRevoked)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("auto_confirm"), false)...)
 }
