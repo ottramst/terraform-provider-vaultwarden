@@ -102,24 +102,22 @@ func (c *Client) authenticateRequest(req *http.Request) error {
 	switch authMethod {
 	case AuthMethodAdmin:
 		// Ensure we have valid admin authentication
-		if err := c.ensureAdminAuth(req.Context()); err != nil {
+		cookie, err := c.adminCookie(req.Context())
+		if err != nil {
 			return fmt.Errorf("admin authentication failed: %w", err)
 		}
 
 		// Add admin cookie to request
-		if c.AuthState.AdminCookie != nil {
-			req.AddCookie(c.AuthState.AdminCookie)
-		}
+		req.AddCookie(cookie)
 	case AuthMethodOAuth2, AuthMethodUserPassword:
 		// Both OAuth2 and user/password methods use JWT tokens
-		if err := c.ensureUserAuth(req.Context()); err != nil {
+		accessToken, _, err := c.userSession(req.Context())
+		if err != nil {
 			return fmt.Errorf("user authentication failed: %w", err)
 		}
 
 		// Add the JWT token as a Bearer token
-		if c.AuthState.AccessToken != "" {
-			req.Header.Set("Authorization", "Bearer "+c.AuthState.AccessToken)
-		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
 	case AuthMethodNone:
 		return fmt.Errorf("no valid authentication method available for path: %s", req.URL.Path)
 	}

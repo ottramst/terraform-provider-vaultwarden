@@ -179,7 +179,7 @@ func (r *OrganizationCollection) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	// Get organization data from cache
-	orgSecret, exists := r.client.AuthState.Organizations[data.OrganizationID.ValueString()]
+	orgSecret, exists := r.client.OrganizationSecret(data.OrganizationID.ValueString())
 	if !exists {
 		resp.Diagnostics.AddError(
 			"Error reading Vaultwarden organization collection",
@@ -302,7 +302,7 @@ func (r *OrganizationCollection) ImportState(ctx context.Context, req resource.I
 	}
 
 	// Get organization data from cache
-	orgSecret, exists := r.client.AuthState.Organizations[idParts[0]]
+	orgSecret, exists := r.client.OrganizationSecret(idParts[0])
 	if !exists {
 		resp.Diagnostics.AddError(
 			"Error importing organization collection",

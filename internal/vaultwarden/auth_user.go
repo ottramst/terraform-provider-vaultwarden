@@ -2,6 +2,7 @@ package vaultwarden
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/crypt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/helpers"
@@ -32,19 +33,33 @@ type TokenResponse struct {
 
 // ensureUserAuth ensures that user authentication is valid.
 func (c *Client) ensureUserAuth(ctx context.Context) error {
+	_, _, err := c.userSession(ctx)
+	return err
+}
+
+// userSession returns the access token and private key of a valid user session, logging in
+// first if needed. Concurrent callers wait for a single login.
+func (c *Client) userSession(ctx context.Context) (string, *rsa.PrivateKey, error) {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+
 	// Check if we have a valid user session
 	if c.AuthState != nil && c.AuthState.AccessToken != "" && c.AuthState.PrivateKey != nil {
 		// Check if token is not expired (with some buffer time)
 		if !c.AuthState.TokenExpiresAt.IsZero() && time.Now().Add(time.Minute).Before(c.AuthState.TokenExpiresAt) {
-			return nil
+			return c.AuthState.AccessToken, c.AuthState.PrivateKey, nil
 		}
 	}
 
 	// Perform user login
-	return c.userLogin(ctx)
+	if err := c.userLogin(ctx); err != nil {
+		return "", nil, err
+	}
+
+	return c.AuthState.AccessToken, c.AuthState.PrivateKey, nil
 }
 
-// userLogin performs the user authentication.
+// userLogin performs the user authentication. The caller must hold authMu.
 func (c *Client) userLogin(ctx context.Context) error {
 	// 1. Get KDF configuration if not already present
 	if c.AuthState == nil || c.AuthState.KdfConfig == nil {
@@ -111,28 +126,25 @@ func (c *Client) userLogin(ctx context.Context) error {
 		return fmt.Errorf("failed to parse token expiration: %w", err)
 	}
 
-	// Update auth state
-	c.AuthState.AccessToken = tokenResp.AccessToken
-	c.AuthState.PrivateKey = privateKey
-	c.AuthState.TokenExpiresAt = expirationTime
-
-	// Getch the user profile
-	user, err := c.GetProfile(ctx)
-	if err != nil {
+	// Fetch the user profile with the new token. GetProfile would wait for this login.
+	var user models.User
+	authorize := func(req *http.Request) error {
+		req.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+		return nil
+	}
+	if _, err := c.send(ctx, http.MethodGet, "/api/accounts/profile", nil, &user, requestOptions{authorize: authorize}); err != nil {
 		return fmt.Errorf("failed to get user profile: %w", err)
 	}
 
-	// Initialize or clear org keys map
-	c.AuthState.Organizations = make(map[string]OrganizationSecret)
-
-	// Save organizations to auth state
+	// Decrypt the organization keys
+	organizations := make(map[string]OrganizationSecret)
 	for _, org := range user.Organizations {
 		if !org.Enabled || org.Key == "" {
 			continue
 		}
 
 		// Decrypt the organization key
-		decryptedKeyBytes, err := keybuilder.RSADecrypt(org.Key, c.AuthState.PrivateKey)
+		decryptedKeyBytes, err := keybuilder.RSADecrypt(org.Key, privateKey)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt organization key for org %s: %w", org.ID, err)
 		}
@@ -144,14 +156,46 @@ func (c *Client) userLogin(ctx context.Context) error {
 		}
 
 		// Store the decrypted key and org info
-		c.AuthState.Organizations[org.ID] = OrganizationSecret{
+		organizations[org.ID] = OrganizationSecret{
 			Key:              *decryptedKey,
 			OrganizationUUID: org.ID,
 			Name:             org.Name,
 		}
 	}
 
+	// Update auth state
+	c.AuthState.AccessToken = tokenResp.AccessToken
+	c.AuthState.PrivateKey = privateKey
+	c.AuthState.TokenExpiresAt = expirationTime
+
+	c.orgMu.Lock()
+	c.AuthState.Organizations = organizations
+	c.orgMu.Unlock()
+
 	return nil
+}
+
+// OrganizationSecret returns the cached key of an organization the user belongs to.
+func (c *Client) OrganizationSecret(orgID string) (OrganizationSecret, bool) {
+	c.orgMu.RLock()
+	defer c.orgMu.RUnlock()
+
+	if c.AuthState == nil {
+		return OrganizationSecret{}, false
+	}
+	secret, ok := c.AuthState.Organizations[orgID]
+	return secret, ok
+}
+
+// setOrganizationSecret caches the key of an organization.
+func (c *Client) setOrganizationSecret(secret OrganizationSecret) {
+	c.orgMu.Lock()
+	defer c.orgMu.Unlock()
+
+	if c.AuthState.Organizations == nil {
+		c.AuthState.Organizations = make(map[string]OrganizationSecret)
+	}
+	c.AuthState.Organizations[secret.OrganizationUUID] = secret
 }
 
 // preloginRequest represents the request body for the prelogin endpoint.

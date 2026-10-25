@@ -8,41 +8,37 @@ import (
 	"time"
 )
 
-// ensureAdminAuth ensures that admin authentication is valid.
-func (c *Client) ensureAdminAuth(ctx context.Context) error {
+// adminCookie returns the cookie of a valid admin session, logging in first if needed.
+// Concurrent callers wait for a single login.
+func (c *Client) adminCookie(ctx context.Context) (*http.Cookie, error) {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+
 	// Check if we have a valid admin session
 	if c.AuthState != nil && c.AuthState.AdminCookie != nil {
 		// Check if cookie is not expired
 		if !c.AuthState.AdminCookie.Expires.IsZero() && time.Now().Before(c.AuthState.AdminCookie.Expires) {
-			return nil
+			return c.AuthState.AdminCookie, nil
 		}
 	}
 
 	// Perform admin login
-	return c.adminLogin(ctx)
+	if err := c.adminLogin(ctx); err != nil {
+		return nil, err
+	}
+
+	return c.AuthState.AdminCookie, nil
 }
 
-// adminLogin performs the admin authentication.
+// adminLogin performs the admin authentication. The caller must hold authMu.
 func (c *Client) adminLogin(ctx context.Context) error {
 	// Create form data
 	form := url.Values{}
 	form.Add("token", c.Credentials.AdminToken)
 
-	// Configure client to not follow redirects. This happens for some versions of Vaultwarden
+	// Make login request. Don't follow redirects, which some versions of Vaultwarden send.
 	// See: https://github.com/dani-garcia/vaultwarden/issues/2444
-	originalClient := c.httpClient
-	c.httpClient = &http.Client{
-		Timeout: originalClient.Timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	defer func() {
-		c.httpClient = originalClient
-	}()
-
-	// Make login request
-	resp, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/admin", form, nil)
+	resp, err := c.send(ctx, http.MethodPost, "/admin", form, nil, requestOptions{noRedirects: true})
 	if err != nil {
 		// Check if this is a redirect error (which we expect)
 		if resp != nil && resp.StatusCode == http.StatusSeeOther {

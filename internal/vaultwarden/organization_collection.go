@@ -16,7 +16,7 @@ func (c *Client) CreateOrganizationCollection(ctx context.Context, orgID string,
 	}
 
 	// Get organization data from cache
-	orgSecret, exists := c.AuthState.Organizations[orgID]
+	orgSecret, exists := c.OrganizationSecret(orgID)
 	if !exists {
 		return nil, fmt.Errorf("organization %s not found in cache", orgID)
 	}
@@ -117,7 +117,7 @@ func (c *Client) UpdateOrganizationCollection(ctx context.Context, orgID, colID 
 	}
 
 	// Get organization data from cache
-	orgSecret, exists := c.AuthState.Organizations[orgID]
+	orgSecret, exists := c.OrganizationSecret(orgID)
 	if !exists {
 		return nil, fmt.Errorf("organization %s not found in cache", orgID)
 	}
@@ -131,6 +131,7 @@ func (c *Client) UpdateOrganizationCollection(ctx context.Context, orgID, colID 
 
 	// Vaultwarden replaces the collection's user and group assignments with the ones
 	// sent, so send back the current ones
+	defer c.lockOrganizationAccess(orgID)()
 	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
 	if err != nil {
 		return nil, err
@@ -150,6 +151,74 @@ func (c *Client) UpdateOrganizationCollection(ctx context.Context, orgID, colID 
 	}
 
 	return &collectionResp, nil
+}
+
+// GetOrganizationCollectionUser returns the access of an organization user to a collection.
+func (c *Client) GetOrganizationCollectionUser(ctx context.Context, orgID, colID, userID string) (*models.CollectionAccess, error) {
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		if _, getErr := c.GetOrganizationCollection(ctx, orgID, colID); IsNotFound(getErr) {
+			return nil, getErr
+		}
+		return nil, err
+	}
+
+	for _, user := range access.Users {
+		if user.ID == userID {
+			return &user, nil
+		}
+	}
+
+	return nil, fmt.Errorf("organization user %s in collection %s: %w", userID, colID, ErrNotFound)
+}
+
+// SetOrganizationCollectionUser grants an organization user access to a collection, or changes
+// it. The access of other users and groups is preserved.
+func (c *Client) SetOrganizationCollectionUser(ctx context.Context, orgID, colID string, userAccess models.CollectionAccess) error {
+	defer c.lockOrganizationAccess(orgID)()
+
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		return err
+	}
+
+	users := []models.CollectionAccess{userAccess}
+	for _, user := range access.Users {
+		if user.ID != userAccess.ID {
+			users = append(users, user)
+		}
+	}
+	access.Users = users
+
+	return c.SetOrganizationCollectionAccess(ctx, orgID, colID, *access)
+}
+
+// RemoveOrganizationCollectionUser removes the access of an organization user to a collection.
+// The access of other users and groups is preserved.
+func (c *Client) RemoveOrganizationCollectionUser(ctx context.Context, orgID, colID, userID string) error {
+	defer c.lockOrganizationAccess(orgID)()
+
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		// Collection already deleted
+		if _, getErr := c.GetOrganizationCollection(ctx, orgID, colID); IsNotFound(getErr) {
+			return nil
+		}
+		return err
+	}
+
+	users := []models.CollectionAccess{}
+	for _, user := range access.Users {
+		if user.ID != userID {
+			users = append(users, user)
+		}
+	}
+	if len(users) == len(access.Users) {
+		return nil
+	}
+	access.Users = users
+
+	return c.SetOrganizationCollectionAccess(ctx, orgID, colID, *access)
 }
 
 // DeleteOrganizationCollection deletes a collection from an organization.

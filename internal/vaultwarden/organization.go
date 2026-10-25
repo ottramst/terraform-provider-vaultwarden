@@ -14,12 +14,14 @@ import (
 // CreateOrganization creates a new Vaultwarden organization.
 func (c *Client) CreateOrganization(ctx context.Context, org models.Organization) (*models.Organization, error) {
 	// First ensure we have valid authentication and thus the private key
-	if err := c.ensureUserAuth(ctx); err != nil {
+	accessToken, privateKey, err := c.userSession(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("authentication required: %w", err)
 	}
 
 	// Create a shared key for the organization
-	encSharedKey, sharedKey, err := keybuilder.GenerateSharedKey(&c.AuthState.PrivateKey.PublicKey)
+
+	encSharedKey, sharedKey, err := keybuilder.GenerateSharedKey(&privateKey.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate shared key: %w", err)
 	}
@@ -46,7 +48,7 @@ func (c *Client) CreateOrganization(ctx context.Context, org models.Organization
 
 	// Set billing email to current user's email if not provided
 	if org.BillingEmail == "" {
-		email, err := helpers.ParseJWTEmail(c.AuthState.AccessToken)
+		email, err := helpers.ParseJWTEmail(accessToken)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user email from token: %w", err)
 		}
@@ -59,16 +61,11 @@ func (c *Client) CreateOrganization(ctx context.Context, org models.Organization
 	}
 
 	// Cache the organization secret
-	if c.AuthState != nil {
-		if c.AuthState.Organizations == nil {
-			c.AuthState.Organizations = make(map[string]OrganizationSecret)
-		}
-		c.AuthState.Organizations[orgResp.ID] = OrganizationSecret{
-			Key:              *sharedKey,
-			OrganizationUUID: orgResp.ID,
-			Name:             orgResp.Name,
-		}
-	}
+	c.setOrganizationSecret(OrganizationSecret{
+		Key:              *sharedKey,
+		OrganizationUUID: orgResp.ID,
+		Name:             orgResp.Name,
+	})
 
 	return &orgResp, nil
 }
@@ -296,6 +293,8 @@ func (c *Client) getOrganizationUserCollectionAccess(ctx context.Context, orgID,
 // UpdateOrganizationUser updates the type of a user in an organization by their ID. The user's
 // existing collection and group assignments are preserved.
 func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID string, req UpdateOrganizationUserRequest) error {
+	defer c.lockOrganizationAccess(orgID)()
+
 	current, err := c.GetOrganizationUser(ctx, userID, orgID)
 	if err != nil {
 		return err

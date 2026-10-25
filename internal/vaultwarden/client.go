@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,6 +41,34 @@ type Client struct {
 
 	// Device info
 	DeviceInfo *DeviceInfo
+
+	// authMu serializes logins and guards the session in AuthState
+	authMu sync.Mutex
+	// orgMu guards AuthState.Organizations
+	orgMu sync.RWMutex
+
+	// accessLocks serializes changes to collection assignments per organization, see lockOrganizationAccess
+	accessLocksMu sync.Mutex
+	accessLocks   map[string]*sync.Mutex
+}
+
+// lockOrganizationAccess locks changes to the collection assignments of an organization and
+// returns the unlock function. Vaultwarden only offers endpoints that replace all assignments
+// of a collection or member, so concurrent read-modify-write updates would overwrite each other.
+func (c *Client) lockOrganizationAccess(orgID string) func() {
+	c.accessLocksMu.Lock()
+	if c.accessLocks == nil {
+		c.accessLocks = make(map[string]*sync.Mutex)
+	}
+	mutex, ok := c.accessLocks[orgID]
+	if !ok {
+		mutex = &sync.Mutex{}
+		c.accessLocks[orgID] = mutex
+	}
+	c.accessLocksMu.Unlock()
+
+	mutex.Lock()
+	return mutex.Unlock
 }
 
 // New creates a new Vaultwarden client with the given endpoint and options.
@@ -121,61 +150,30 @@ func prepareRequestBody(reqBody interface{}) (io.Reader, string, error) {
 	return bodyReader, contentType, nil
 }
 
+// requestOptions configures how send performs a request.
+type requestOptions struct {
+	// authorize adds authentication to the request, if set
+	authorize func(*http.Request) error
+	// noRedirects returns redirect responses instead of following them
+	noRedirects bool
+}
+
 // doUnauthenticatedRequest performs a request without authentication
 //
 //nolint:unparam
 func (c *Client) doUnauthenticatedRequest(ctx context.Context, method, path string, reqBody, respBody interface{}) (*http.Response, error) {
-	// Prepare request body
-	bodyReader, contentType, err := prepareRequestBody(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare request body: %w", err)
-	}
-
-	// Create request with context
-	reqURL := c.requestURL(path)
-	req, err := http.NewRequestWithContext(ctx, method, reqURL.String(), bodyReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set content type if body is present
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	req.Header.Set("Accept", "application/json")
-
-	// Send request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle error responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp, &APIError{StatusCode: resp.StatusCode, Status: resp.Status, Body: string(body)}
-	}
-
-	// Parse successful response if a response struct is provided
-	if respBody != nil && len(body) > 0 {
-		if err := json.Unmarshal(body, respBody); err != nil {
-			return nil, fmt.Errorf("failed to decode response: %w", err)
-		}
-	}
-
-	return resp, nil
+	return c.send(ctx, method, path, reqBody, respBody, requestOptions{})
 }
 
 // doRequest performs a request with appropriate authentication
 //
 //nolint:unparam
 func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, respBody interface{}) (*http.Response, error) {
+	return c.send(ctx, method, path, reqBody, respBody, requestOptions{authorize: c.authenticateRequest})
+}
+
+// send performs a request and decodes a JSON response into respBody, if set.
+func (c *Client) send(ctx context.Context, method, path string, reqBody, respBody interface{}, opts requestOptions) (*http.Response, error) {
 	// Prepare request body
 	bodyReader, contentType, err := prepareRequestBody(reqBody)
 	if err != nil {
@@ -196,12 +194,25 @@ func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, re
 	req.Header.Set("Accept", "application/json")
 
 	// Add authentication to request
-	if err := c.authenticateRequest(req); err != nil {
-		return nil, fmt.Errorf("failed to authenticate request: %w", err)
+	if opts.authorize != nil {
+		if err := opts.authorize(req); err != nil {
+			return nil, fmt.Errorf("failed to authenticate request: %w", err)
+		}
+	}
+
+	httpClient := c.httpClient
+	if opts.noRedirects {
+		httpClient = &http.Client{
+			Transport: c.httpClient.Transport,
+			Timeout:   c.httpClient.Timeout,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
 	}
 
 	// Send request
-	resp, err := c.httpClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
