@@ -1,7 +1,15 @@
 ## Unreleased
 
+FEATURES:
+
+* **New List Resource:** `vaultwarden_organization_user` - Find the members of an organization with `terraform query` (Terraform 1.14+), optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). `terraform query -generate-config-out` generates `import` blocks for them
+* **New List Resource:** `vaultwarden_organization_collection` - Find the collections of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_organization_group` - Find the groups of an organization with `terraform query`, optionally filtered with `name_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+* **New List Resource:** `vaultwarden_user` - Find the users of the server with `terraform query` and the admin API, optionally filtered with `email_contains` ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60))
+
 ENHANCEMENTS:
 
+* resource/vaultwarden_organization_user, resource/vaultwarden_organization_collection, resource/vaultwarden_organization_group, resource/vaultwarden_user: Support resource identity ([#60](https://github.com/ottramst/terraform-provider-vaultwarden/issues/60)). In Terraform 1.12 and later, these resources can be imported with an `identity` (`organization_id` and `id`, or `id` for `vaultwarden_user`) in an `import` block. Import IDs keep working, and state written by earlier versions gets its identity on the next refresh, without changes
 * resource/vaultwarden_account_register: New write-only `password_wo` attribute, with `password_wo_version`, to register an account without storing its password in the plan or state. Requires Terraform 1.11 or later. Exactly one of `password` and `password_wo` must be set; existing configurations with `password` keep working unchanged. Changing `password_wo_version` registers the account again, like changing `password`. Moving the same password from `password` to `password_wo` updates the state without replacing the account ([#58](https://github.com/ottramst/terraform-provider-vaultwarden/issues/58))
 
 BUG FIXES:
