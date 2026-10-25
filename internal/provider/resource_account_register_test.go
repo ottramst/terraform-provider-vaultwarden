@@ -1,9 +1,13 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/test"
 	"regexp"
 	"testing"
@@ -42,6 +46,50 @@ func TestAccAccountRegister(t *testing.T) {
 				ExpectError: regexp.MustCompile("user already exists"),
 			},
 			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+// New accounts use the default KDF settings, not ones from a prelogin, which are decoys for
+// emails without an account. Uses a provider with only the admin token, so there is no
+// provider user to take the settings from either.
+func TestAccAccountRegisterDefaultKdf(t *testing.T) {
+	email := gofakeit.Email()
+	password := gofakeit.Password(true, true, true, true, false, 16)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+provider "vaultwarden" {
+  endpoint    = %[1]q
+  admin_token = %[2]q
+}
+
+resource "vaultwarden_account_register" "test" {
+  email    = %[3]q
+  password = %[4]q
+}
+`, test.TestBaseURL, test.TestAdminToken, email, password),
+				Check: func(*terraform.State) error {
+					client, err := vaultwarden.New(test.TestBaseURL, vaultwarden.WithUserCredentials(email, password))
+					if err != nil {
+						return err
+					}
+					prelogin, err := client.PreLogin(context.Background())
+					if err != nil {
+						return err
+					}
+					want := models.DefaultKdfConfiguration()
+					if prelogin.Kdf != want.KdfType || prelogin.KdfIterations != want.KdfIterations {
+						return fmt.Errorf("account registered with KDF %d and %d iterations, want %d and %d",
+							prelogin.Kdf, prelogin.KdfIterations, want.KdfType, want.KdfIterations)
+					}
+					return nil
+				},
+			},
 		},
 	})
 }
