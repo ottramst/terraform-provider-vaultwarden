@@ -354,6 +354,7 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		AccountRegisterResource,
+		FolderResource,
 		OrganizationAPIKeyRotationResource,
 		OrganizationCollectionResource,
 		OrganizationCollectionGroupResource,
@@ -369,6 +370,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 
 func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		NewFolderDataSource,
 		NewOrganizationDataSource,
 		NewOrganizationsDataSource,
 		NewOrganizationCollectionDataSource,
