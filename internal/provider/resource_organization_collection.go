@@ -14,13 +14,13 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/crypt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/encryptedstring"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
-	"strings"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &OrganizationCollection{}
 var _ resource.ResourceWithConfigure = &OrganizationCollection{}
 var _ resource.ResourceWithImportState = &OrganizationCollection{}
+var _ resource.ResourceWithIdentity = &OrganizationCollection{}
 
 func OrganizationCollectionResource() resource.Resource {
 	return &OrganizationCollection{}
@@ -80,6 +80,10 @@ func (r *OrganizationCollection) Schema(ctx context.Context, req resource.Schema
 			},
 		},
 	}
+}
+
+func (r *OrganizationCollection) IdentitySchema(ctx context.Context, req resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = organizationObjectIdentitySchema("collection")
 }
 
 func (r *OrganizationCollection) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -151,6 +155,7 @@ func (r *OrganizationCollection) Create(ctx context.Context, req resource.Create
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationCollection) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -224,6 +229,7 @@ func (r *OrganizationCollection) Read(ctx context.Context, req resource.ReadRequ
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationCollection) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -252,6 +258,7 @@ func (r *OrganizationCollection) Update(ctx context.Context, req resource.Update
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(setOrganizationObjectIdentity(ctx, resp.Identity, data.OrganizationID, data.ID)...)
 }
 
 func (r *OrganizationCollection) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -275,34 +282,23 @@ func (r *OrganizationCollection) Delete(ctx context.Context, req resource.Delete
 }
 
 func (r *OrganizationCollection) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	idParts := strings.Split(req.ID, "/")
-	if len(idParts) != 2 {
-		resp.Diagnostics.AddError(
-			"Invalid ID format",
-			"Expected import identifier with format: organization_id/collection_id",
-		)
+	organizationID, collectionID, ok := importOrganizationObject(ctx, req, resp, "collection_id")
+	if !ok {
 		return
 	}
 
-	organizationID := idParts[0]
-	collectionID := idParts[1]
-
-	// Set the organization_id and id attributes
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_id"), organizationID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), collectionID)...)
-
 	// After setting the IDs, fetch the current state of the resource
-	collection, err := r.client.GetOrganizationCollection(ctx, idParts[0], idParts[1])
+	collection, err := r.client.GetOrganizationCollection(ctx, organizationID, collectionID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error importing organization collection",
-			fmt.Sprintf("Cannot read organization collection %s: %v", req.ID, err),
+			fmt.Sprintf("Cannot read organization collection %s/%s: %v", organizationID, collectionID, err),
 		)
 		return
 	}
 
 	// Get organization data from cache
-	orgSecret, exists := r.client.OrganizationSecret(idParts[0])
+	orgSecret, exists := r.client.OrganizationSecret(organizationID)
 	if !exists {
 		resp.Diagnostics.AddError(
 			"Error importing organization collection",

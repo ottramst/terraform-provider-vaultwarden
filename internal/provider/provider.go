@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -23,6 +24,7 @@ import (
 // Ensure VaultwardenProvider satisfies various provider interfaces.
 var _ provider.Provider = &VaultwardenProvider{}
 var _ provider.ProviderWithFunctions = &VaultwardenProvider{}
+var _ provider.ProviderWithListResources = &VaultwardenProvider{}
 
 // VaultwardenProvider defines the provider implementation.
 type VaultwardenProvider struct {
@@ -343,6 +345,7 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	// type Configure methods.
 	resp.DataSourceData = client
 	resp.ResourceData = client
+	resp.ListResourceData = client
 }
 
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
@@ -373,6 +376,15 @@ func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasour
 		NewOrganizationUsersDataSource,
 		NewUserDataSource,
 		NewUsersDataSource,
+	}
+}
+
+func (p *VaultwardenProvider) ListResources(ctx context.Context) []func() list.ListResource {
+	return []func() list.ListResource{
+		NewOrganizationCollectionListResource,
+		NewOrganizationGroupListResource,
+		NewOrganizationUserListResource,
+		NewUserListResource,
 	}
 }
 
