@@ -318,3 +318,76 @@ func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID strin
 
 	return nil
 }
+
+// organizationUserPublicKeys is the response of the organization member public keys endpoint.
+type organizationUserPublicKeys struct {
+	Data []struct {
+		ID  string  `json:"id"`
+		Key *string `json:"key"`
+	} `json:"data"`
+}
+
+// ConfirmOrganizationUser confirms a member that accepted the invitation, by encrypting the
+// organization key with the member's public key. Vaultwarden only confirms accepted members.
+func (c *Client) ConfirmOrganizationUser(ctx context.Context, userID, orgID string) error {
+	if err := c.ensureUserAuth(ctx); err != nil {
+		return fmt.Errorf("authentication required: %w", err)
+	}
+
+	orgSecret, exists := c.OrganizationSecret(orgID)
+	if !exists {
+		return fmt.Errorf("organization %s not found in cache", orgID)
+	}
+
+	var keys organizationUserPublicKeys
+	keysReq := map[string][]string{"ids": {userID}}
+	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/organizations/%s/users/public-keys", orgID), keysReq, &keys); err != nil {
+		return fmt.Errorf("failed to get the public key of organization user: %w", err)
+	}
+
+	var encodedKey string
+	for _, key := range keys.Data {
+		if key.ID == userID && key.Key != nil {
+			encodedKey = *key.Key
+		}
+	}
+	if encodedKey == "" {
+		return fmt.Errorf("organization user %s has no public key", userID)
+	}
+
+	publicKey, err := keybuilder.ParsePublicKey(encodedKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse the public key of organization user %s: %w", userID, err)
+	}
+
+	encryptedKey, err := keybuilder.RSAEncrypt(orgSecret.Key.Key, publicKey)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt organization key: %w", err)
+	}
+
+	confirmReq := map[string]string{"key": encryptedKey}
+	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/organizations/%s/users/%s/confirm", orgID, userID), confirmReq, nil); err != nil {
+		return fmt.Errorf("failed to confirm organization user: %w", err)
+	}
+
+	return nil
+}
+
+// RevokeOrganizationUser revokes a member's access to the organization. The member stays in
+// the organization and keeps the status they had, which a restore brings back.
+func (c *Client) RevokeOrganizationUser(ctx context.Context, userID, orgID string) error {
+	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s/revoke", orgID, userID), nil, nil); err != nil {
+		return fmt.Errorf("failed to revoke organization user: %w", err)
+	}
+
+	return nil
+}
+
+// RestoreOrganizationUser restores a revoked member to the status they had before.
+func (c *Client) RestoreOrganizationUser(ctx context.Context, userID, orgID string) error {
+	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s/restore", orgID, userID), nil, nil); err != nil {
+		return fmt.Errorf("failed to restore organization user: %w", err)
+	}
+
+	return nil
+}
