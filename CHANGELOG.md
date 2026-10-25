@@ -1,5 +1,9 @@
 ## Unreleased
 
+FEATURES:
+
+* **New Resource:** `vaultwarden_organization_collection_user` - Give an organization user access to a collection, with `read_only`, `hide_passwords` and `manage` ([#23](https://github.com/ottramst/terraform-provider-vaultwarden/issues/23)). Access of other users and groups to the collection is left unchanged
+
 ENHANCEMENTS:
 
 * resource/vaultwarden_account_register: Support import by ID. The password cannot be read back, and setting it after an import only updates the state
@@ -15,6 +19,7 @@ BUG FIXES:
 * provider: Resources deleted outside Terraform are now removed from state and planned for creation, instead of failing the refresh. Deleting a resource that is already gone now succeeds ([#44](https://github.com/ottramst/terraform-provider-vaultwarden/issues/44))
 * resource/vaultwarden_organization_user, resource/vaultwarden_organization_collection: Updates no longer remove the collection and group assignments of the user or collection, for example ones made in the web vault ([#45](https://github.com/ottramst/terraform-provider-vaultwarden/issues/45))
 * resource/vaultwarden_user, resource/vaultwarden_account_register, resource/vaultwarden_organization_user: Changing `email` (and `name` or `password` of an `account_register`) now replaces the resource. Previously the change was reported as applied but never sent to the server. Replacing a user or a registered account deletes it, including its vault ([#46](https://github.com/ottramst/terraform-provider-vaultwarden/issues/46))
+* provider: Fixed a race that could fail a refresh or apply with "organization not found or not authenticated" when several resources triggered a login at the same time. Concurrent requests now wait for a single login, and the admin login no longer affects requests running at the same time
 * provider: Creating an organization no longer crashes the provider when key generation fails ([#47](https://github.com/ottramst/terraform-provider-vaultwarden/issues/47))
 * security: Updated `google.golang.org/grpc` to v1.84.0 and `golang.org/x/crypto` to v0.58.0
 
