@@ -28,7 +28,7 @@ var (
 )
 
 // GetTestBaseURL returns the base URL for the Vaultwarden instance
-// It can be configured via the VW_TEST_URL environment variable
+// It can be configured via the VW_TEST_URL environment variable.
 func GetTestBaseURL() string {
 	if url := os.Getenv("VW_TEST_URL"); url != "" {
 		return url
@@ -37,7 +37,7 @@ func GetTestBaseURL() string {
 	return "http://tf-vaultwarden:8000"
 }
 
-// GetTestClient returns a singleton test client, creating it if necessary
+// GetTestClient returns a singleton test client, creating it if necessary.
 func GetTestClient(ctx context.Context, t *testing.T) (*vaultwarden.Client, error) {
 	t.Logf("Getting test client for email: %s", TestEmail)
 	testClientOnce.Do(func() {
@@ -52,7 +52,7 @@ func GetTestClient(ctx context.Context, t *testing.T) (*vaultwarden.Client, erro
 	return testClient, testClientError
 }
 
-// createTestAccount creates a test user account for acceptance tests
+// createTestAccount creates a test user account for acceptance tests.
 func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, string, error) {
 	t.Logf("Creating test account with email: %s at %s", TestEmail, TestBaseURL)
 
@@ -150,7 +150,7 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 	return client, hashedPw, nil
 }
 
-// LoginTestClient performs a login with the test client
+// LoginTestClient performs a login with the test client.
 func LoginTestClient(ctx context.Context, t *testing.T) error {
 	client, err := GetTestClient(ctx, t)
 	if err != nil {
@@ -164,7 +164,7 @@ func LoginTestClient(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
-// isUserExistsError checks if the error indicates the user already exists
+// isUserExistsError checks if the error indicates the user already exists.
 func isUserExistsError(err error) bool {
 	return err != nil && (strings.Contains(err.Error(), "user already exists") ||
 		strings.Contains(err.Error(), "email already taken") ||

@@ -53,7 +53,7 @@ func TestAccOrganization(t *testing.T) {
 	})
 }
 
-// Base configuration
+// Base configuration.
 func testAccOrganizationConfig(name string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {
@@ -69,7 +69,7 @@ resource "vaultwarden_organization" "test" {
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, name)
 }
 
-// Updated configuration with modified name and billing_email
+// Updated configuration with modified name and billing_email.
 func testAccOrganizationConfigUpdated(name string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {

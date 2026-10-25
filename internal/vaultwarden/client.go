@@ -19,14 +19,14 @@ const (
 	DefaultDeviceName = "Vaultwarden_Terraform_Provider"
 )
 
-// DeviceInfo holds information about the client device
+// DeviceInfo holds information about the client device.
 type DeviceInfo struct {
 	DeviceType       string
 	DeviceIdentifier string
 	DeviceName       string
 }
 
-// Client represents a Vaultwarden API client
+// Client represents a Vaultwarden API client.
 type Client struct {
 	endpoint   *url.URL
 	httpClient *http.Client
@@ -42,7 +42,7 @@ type Client struct {
 	DeviceInfo *DeviceInfo
 }
 
-// New creates a new Vaultwarden client with the given endpoint and options
+// New creates a new Vaultwarden client with the given endpoint and options.
 func New(endpoint string, opts ...ClientOption) (*Client, error) {
 	parsedURL, err := url.Parse(endpoint)
 	if err != nil {
@@ -80,7 +80,7 @@ func New(endpoint string, opts ...ClientOption) (*Client, error) {
 	return client, nil
 }
 
-// prepareRequestBody prepares the request body and returns the appropriate content type
+// prepareRequestBody prepares the request body and returns the appropriate content type.
 func prepareRequestBody(reqBody interface{}) (io.Reader, string, error) {
 	if reqBody == nil {
 		return nil, "", nil

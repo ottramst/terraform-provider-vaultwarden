@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-// CreateOrganizationCollection creates a new Vaultwarden organization collection
+// CreateOrganizationCollection creates a new Vaultwarden organization collection.
 func (c *Client) CreateOrganizationCollection(ctx context.Context, orgID string, collection models.Collection) (*models.Collection, error) {
 	// First ensure we have valid authentication
 	if err := c.ensureUserAuth(ctx); err != nil {
@@ -45,7 +45,7 @@ func (c *Client) CreateOrganizationCollection(ctx context.Context, orgID string,
 	return &collectionResp, nil
 }
 
-// GetOrganizationCollection retrieves a specific collection from an organization
+// GetOrganizationCollection retrieves a specific collection from an organization.
 func (c *Client) GetOrganizationCollection(ctx context.Context, orgID string, collectionID string) (*models.Collection, error) {
 	var listResp models.OrganizationCollections
 	if _, err := c.doRequest(
@@ -68,7 +68,7 @@ func (c *Client) GetOrganizationCollection(ctx context.Context, orgID string, co
 	return nil, fmt.Errorf("collection %s not found in organization %s", collectionID, orgID)
 }
 
-// UpdateOrganizationCollection updates an existing Vaultwarden organization collection
+// UpdateOrganizationCollection updates an existing Vaultwarden organization collection.
 func (c *Client) UpdateOrganizationCollection(ctx context.Context, orgID, colID string, collection models.Collection) (*models.Collection, error) {
 	// First ensure we have valid authentication
 	if err := c.ensureUserAuth(ctx); err != nil {

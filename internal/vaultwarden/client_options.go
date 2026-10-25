@@ -5,10 +5,10 @@ import (
 	"net/http"
 )
 
-// ClientOption defines a function type for configuring the Client
+// ClientOption defines a function type for configuring the Client.
 type ClientOption func(*Client) error
 
-// WithHTTPClient allows setting a custom HTTP client
+// WithHTTPClient allows setting a custom HTTP client.
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) error {
 		if httpClient == nil {
@@ -19,7 +19,7 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 	}
 }
 
-// WithDeviceType sets a custom device type
+// WithDeviceType sets a custom device type.
 func WithDeviceType(deviceType string) ClientOption {
 	return func(c *Client) error {
 		if deviceType == "" {
@@ -30,7 +30,7 @@ func WithDeviceType(deviceType string) ClientOption {
 	}
 }
 
-// WithDeviceName sets a custom device name
+// WithDeviceName sets a custom device name.
 func WithDeviceName(deviceName string) ClientOption {
 	return func(c *Client) error {
 		if deviceName == "" {
@@ -41,7 +41,7 @@ func WithDeviceName(deviceName string) ClientOption {
 	}
 }
 
-// WithAdminToken sets the admin token for the client
+// WithAdminToken sets the admin token for the client.
 func WithAdminToken(token string) ClientOption {
 	return func(c *Client) error {
 		c.Credentials.AdminToken = token
@@ -49,7 +49,7 @@ func WithAdminToken(token string) ClientOption {
 	}
 }
 
-// WithUserCredentials sets the email and master password for the client
+// WithUserCredentials sets the email and master password for the client.
 func WithUserCredentials(email, masterPassword string) ClientOption {
 	return func(c *Client) error {
 		c.Credentials.Email = email
@@ -58,7 +58,7 @@ func WithUserCredentials(email, masterPassword string) ClientOption {
 	}
 }
 
-// WithOAuth2Credentials sets the client ID and secret for OAuth2 authentication
+// WithOAuth2Credentials sets the client ID and secret for OAuth2 authentication.
 func WithOAuth2Credentials(clientID, clientSecret string) ClientOption {
 	return func(c *Client) error {
 		c.Credentials.ClientID = clientID

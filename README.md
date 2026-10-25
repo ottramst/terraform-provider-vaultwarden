@@ -9,7 +9,7 @@ The Vaultwarden provider allows you to manage and configure [Vaultwarden](https:
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.8
-- [Go](https://golang.org/doc/install) >= 1.23
+- [Go](https://golang.org/doc/install) >= 1.27
 
 ## Getting started
 

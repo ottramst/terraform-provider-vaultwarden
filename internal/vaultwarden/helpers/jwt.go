@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ParseJWTExpiration parses the expiration time of a JWT token
+// ParseJWTExpiration parses the expiration time of a JWT token.
 func ParseJWTExpiration(tokenString string) (time.Time, error) {
 	// Split the token
 	parts := strings.Split(tokenString, ".")
@@ -34,7 +34,7 @@ func ParseJWTExpiration(tokenString string) (time.Time, error) {
 	return time.Unix(claims.Exp, 0), nil
 }
 
-// ParseJWTEmail parses the email of a JWT token
+// ParseJWTEmail parses the email of a JWT token.
 func ParseJWTEmail(tokenString string) (string, error) {
 	// Split the token
 	parts := strings.Split(tokenString, ".")

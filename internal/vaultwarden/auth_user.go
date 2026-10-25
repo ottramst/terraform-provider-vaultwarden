@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// TokenResponse represents the response from the login endpoint
+// TokenResponse represents the response from the login endpoint.
 type TokenResponse struct {
 	Kdf                 models.KdfType `json:"Kdf"`
 	KdfIterations       int            `json:"KdfIterations"`
@@ -30,7 +30,7 @@ type TokenResponse struct {
 	UnofficialServer    bool           `json:"unofficialServer"`
 }
 
-// ensureUserAuth ensures that user authentication is valid
+// ensureUserAuth ensures that user authentication is valid.
 func (c *Client) ensureUserAuth(ctx context.Context) error {
 	// Check if we have a valid user session
 	if c.AuthState != nil && c.AuthState.AccessToken != "" && c.AuthState.PrivateKey != nil {
@@ -44,7 +44,7 @@ func (c *Client) ensureUserAuth(ctx context.Context) error {
 	return c.userLogin(ctx)
 }
 
-// userLogin performs the user authentication
+// userLogin performs the user authentication.
 func (c *Client) userLogin(ctx context.Context) error {
 	// 1. Get KDF configuration if not already present
 	if c.AuthState == nil || c.AuthState.KdfConfig == nil {
@@ -154,12 +154,12 @@ func (c *Client) userLogin(ctx context.Context) error {
 	return nil
 }
 
-// preloginRequest represents the request body for the prelogin endpoint
+// preloginRequest represents the request body for the prelogin endpoint.
 type preloginRequest struct {
 	Email string `json:"email"`
 }
 
-// PreloginResponse represents the response from the prelogin endpoint
+// PreloginResponse represents the response from the prelogin endpoint.
 type PreloginResponse struct {
 	Kdf            models.KdfType `json:"kdf"`
 	KdfIterations  int            `json:"kdfIterations"`
@@ -167,7 +167,7 @@ type PreloginResponse struct {
 	KdfParallelism int            `json:"kdfParallelism"`
 }
 
-// PreLogin retrieves KDF configuration for the given email
+// PreLogin retrieves KDF configuration for the given email.
 func (c *Client) PreLogin(ctx context.Context) (*PreloginResponse, error) {
 	// Prepare request body
 	reqBody := preloginRequest{

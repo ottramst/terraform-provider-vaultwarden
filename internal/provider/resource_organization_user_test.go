@@ -78,7 +78,7 @@ func TestAccOrganizationUserInvalidType(t *testing.T) {
 	})
 }
 
-// Basic configuration with default values
+// Basic configuration with default values.
 func testAccOrganizationUserConfigBasic(orgName, email string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {
@@ -99,7 +99,7 @@ resource "vaultwarden_organization_user" "test" {
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, orgName, email)
 }
 
-// Configuration with custom type and access_all settings
+// Configuration with custom type and access_all settings.
 func testAccOrganizationUserConfigCustom(orgName, email, userType string, accessAll bool) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {
@@ -122,7 +122,7 @@ resource "vaultwarden_organization_user" "test" {
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, orgName, email, userType, accessAll)
 }
 
-// Import state function
+// Import state function.
 func testAccOrganizationUserImportStateIdFunc() resource.ImportStateIdFunc {
 	return func(s *terraform.State) (string, error) {
 		rs, ok := s.RootModule().Resources["vaultwarden_organization_user.test"]

@@ -8,7 +8,7 @@ import (
 	"net/mail"
 )
 
-// RegisterUserRequest represents the request body for registering a user
+// RegisterUserRequest represents the request body for registering a user.
 type RegisterUserRequest struct {
 	Email              string         `json:"email"`
 	MasterPasswordHash string         `json:"masterPasswordHash"`
@@ -21,7 +21,7 @@ type RegisterUserRequest struct {
 	Keys               models.KeyPair `json:"keys"`
 }
 
-// RegisterUser registers a new user
+// RegisterUser registers a new user.
 func (c *Client) RegisterUser(ctx context.Context, req RegisterUserRequest) error {
 	if _, err := c.doUnauthenticatedRequest(ctx, http.MethodPost, "/api/accounts/register", req, nil); err != nil {
 		return fmt.Errorf("failed to register user: %w", err)
@@ -30,7 +30,7 @@ func (c *Client) RegisterUser(ctx context.Context, req RegisterUserRequest) erro
 	return nil
 }
 
-// InviteUser invites a new user to Vaultwarden
+// InviteUser invites a new user to Vaultwarden.
 func (c *Client) InviteUser(ctx context.Context, user models.User) (*models.User, error) {
 	// Validate email format
 	if _, err := mail.ParseAddress(user.Email); err != nil {
@@ -45,7 +45,7 @@ func (c *Client) InviteUser(ctx context.Context, user models.User) (*models.User
 	return &userResp, nil
 }
 
-// GetUser retrieves a user by their ID
+// GetUser retrieves a user by their ID.
 func (c *Client) GetUser(ctx context.Context, ID string) (*models.User, error) {
 	if ID == "" {
 		return nil, fmt.Errorf("user ID is required")
@@ -59,7 +59,7 @@ func (c *Client) GetUser(ctx context.Context, ID string) (*models.User, error) {
 	return &user, nil
 }
 
-// DeleteUser deletes a user by their ID
+// DeleteUser deletes a user by their ID.
 func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 	if ID == "" {
 		return fmt.Errorf("user ID is required")
@@ -72,7 +72,7 @@ func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 	return nil
 }
 
-// GetUserByEmail retrieves a user by their email address
+// GetUserByEmail retrieves a user by their email address.
 func (c *Client) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
 	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/admin/users/by-mail/%s", email), nil, &user); err != nil {

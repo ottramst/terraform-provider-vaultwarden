@@ -2,11 +2,6 @@ name: Test
 
 on:
   workflow_call:
-    inputs:
-      go-version:
-        required: true
-        type: string
-        description: 'The version of Go to use for the action.'
 
 permissions:
   contents: read
@@ -50,7 +45,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go-version }}
+          go-version-file: 'go.mod'
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_wrapper: false

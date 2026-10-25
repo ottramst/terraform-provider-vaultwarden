@@ -2,11 +2,6 @@ name: Build
 
 on:
   workflow_call:
-    inputs:
-      go-version:
-        required: true
-        type: string
-        description: 'The version of Go to use for the action.'
 
 jobs:
   build:
@@ -16,7 +11,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go-version }}
+          go-version-file: 'go.mod'
       - name: Build
         run: make build-ci
       - name: Upload build artifacts

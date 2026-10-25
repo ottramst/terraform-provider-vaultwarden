@@ -1,6 +1,6 @@
 package models
 
-// Credentials represents different types of authentication credentials
+// Credentials represents different types of authentication credentials.
 type Credentials struct {
 	// Admin credentials
 	AdminToken string
