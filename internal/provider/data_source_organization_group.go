@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -54,9 +56,10 @@ func (d *OrganizationGroupDataSource) Schema(ctx context.Context, req datasource
 				Computed:            true,
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the group. Exactly one of `id` and `name` must be set. The name must match exactly one group",
-				Optional:            true,
-				Computed:            true,
+				MarkdownDescription: "The name of the group to look up, compared exactly. Group names are not unique: " +
+					"when several groups have the name, the lookup fails and lists their IDs. Exactly one of `id` and `name` must be set",
+				Optional: true,
+				Computed: true,
 			},
 			"external_id": schema.StringAttribute{
 				MarkdownDescription: "The external ID of the group",
@@ -73,23 +76,9 @@ func (d *OrganizationGroupDataSource) ConfigValidators(ctx context.Context) []da
 }
 
 func (d *OrganizationGroupDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
+	if client := configureLookupClient(req, resp); client != nil {
+		d.client = client
 	}
-
-	client, ok := req.ProviderData.(*vaultwarden.Client)
-
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *vaultwarden.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
-		return
-	}
-
-	d.client = client
 }
 
 func (d *OrganizationGroupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -108,7 +97,7 @@ func (d *OrganizationGroupDataSource) Read(ctx context.Context, req datasource.R
 		details, err := d.client.GetOrganizationGroup(ctx, orgID, data.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error reading Vaultwarden organization group",
+				"Error Reading Organization Group",
 				fmt.Sprintf("Could not read group %s of organization %s: %s", data.ID.ValueString(), orgID, err),
 			)
 			return
@@ -117,10 +106,7 @@ func (d *OrganizationGroupDataSource) Read(ctx context.Context, req datasource.R
 	} else {
 		groups, err := d.client.GetOrganizationGroups(ctx, orgID)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error reading Vaultwarden organization groups",
-				fmt.Sprintf("Could not list the groups of organization %s: %s", orgID, err),
-			)
+			addOrganizationListError(&resp.Diagnostics, orgID, "Groups", err)
 			return
 		}
 
@@ -134,16 +120,22 @@ func (d *OrganizationGroupDataSource) Read(ctx context.Context, req datasource.R
 		switch len(matches) {
 		case 0:
 			resp.Diagnostics.AddError(
-				"Organization group not found",
-				fmt.Sprintf("Organization %s has no group named %q. Groups also require the ORG_GROUPS_ENABLED=true setting on the Vaultwarden server.", orgID, name),
+				"Organization Group Not Found",
+				fmt.Sprintf("Organization %s has no group with name %q. Groups also require the ORG_GROUPS_ENABLED=true setting on the Vaultwarden server.", orgID, name),
 			)
 			return
 		case 1:
 			group = &matches[0]
 		default:
+			ids := make([]string, 0, len(matches))
+			for _, g := range matches {
+				ids = append(ids, g.ID)
+			}
+			sort.Strings(ids)
 			resp.Diagnostics.AddError(
-				"Multiple organization groups found",
-				fmt.Sprintf("Organization %s has %d groups named %q. Use id to select one.", orgID, len(matches), name),
+				"Multiple Organization Groups Found",
+				fmt.Sprintf("Organization %s has %d groups with name %q (IDs: %s). Look the group up by `id` instead.",
+					orgID, len(matches), name, strings.Join(ids, ", ")),
 			)
 			return
 		}

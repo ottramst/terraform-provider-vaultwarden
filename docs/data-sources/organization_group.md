@@ -37,7 +37,7 @@ data "vaultwarden_organization_group" "by_id" {
 ### Optional
 
 - `id` (String) ID of the group. Exactly one of `id` and `name` must be set
-- `name` (String) The name of the group. Exactly one of `id` and `name` must be set. The name must match exactly one group
+- `name` (String) The name of the group to look up, compared exactly. Group names are not unique: when several groups have the name, the lookup fails and lists their IDs. Exactly one of `id` and `name` must be set
 
 ### Read-Only
 

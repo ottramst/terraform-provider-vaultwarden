@@ -208,6 +208,9 @@ func (c *Client) InviteOrganizationUser(ctx context.Context, req InviteOrganizat
 func (c *Client) GetOrganizationUsers(ctx context.Context, orgID string) (*models.OrganizationUsers, error) {
 	var users models.OrganizationUsers
 	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/users", orgID), nil, &users); err != nil {
+		if c.organizationGone(ctx, orgID, err) {
+			return nil, fmt.Errorf("organization %s: %w", orgID, ErrNotFound)
+		}
 		return nil, fmt.Errorf("failed to get organization users: %w", err)
 	}
 
