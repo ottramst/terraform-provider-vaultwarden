@@ -155,6 +155,27 @@ func (c *Client) userLogin(ctx context.Context) error {
 	}
 
 	// Decrypt the organization keys
+	organizations, err := decryptOrganizationSecrets(&user, privateKey)
+	if err != nil {
+		return err
+	}
+
+	// Update auth state
+	c.AuthState.AccessToken = tokenResp.AccessToken
+	c.AuthState.PrivateKey = privateKey
+	c.AuthState.UserKey = encryptionKey
+	c.AuthState.UserID = user.ID
+	c.AuthState.TokenExpiresAt = expirationTime
+
+	c.orgMu.Lock()
+	c.AuthState.Organizations = organizations
+	c.orgMu.Unlock()
+
+	return nil
+}
+
+// decryptOrganizationSecrets decrypts the keys of the organizations in the user's profile.
+func decryptOrganizationSecrets(user *models.User, privateKey *rsa.PrivateKey) (map[string]OrganizationSecret, error) {
 	organizations := make(map[string]OrganizationSecret)
 	for _, org := range user.Organizations {
 		if !org.Enabled || org.Key == "" {
@@ -164,33 +185,42 @@ func (c *Client) userLogin(ctx context.Context) error {
 		// Decrypt the organization key
 		decryptedKeyBytes, err := keybuilder.RSADecrypt(org.Key, privateKey)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt organization key for org %s: %w", org.ID, err)
+			return nil, fmt.Errorf("failed to decrypt organization key for org %s: %w", org.ID, err)
 		}
 
 		// Convert decrypted key to symmetrickey.Key
 		decryptedKey, err := symmetrickey.NewFromRawBytes(decryptedKeyBytes)
 		if err != nil {
-			return fmt.Errorf("failed to construct symmetric key for org %s: %w", org.ID, err)
+			return nil, fmt.Errorf("failed to construct symmetric key for org %s: %w", org.ID, err)
 		}
 
-		// Store the decrypted key and org info
 		organizations[org.ID] = OrganizationSecret{
 			Key:              *decryptedKey,
 			OrganizationUUID: org.ID,
 			Name:             org.Name,
 		}
 	}
+	return organizations, nil
+}
 
-	// Update auth state
-	c.AuthState.AccessToken = tokenResp.AccessToken
-	c.AuthState.PrivateKey = privateKey
-	c.AuthState.UserKey = encryptionKey
-	c.AuthState.TokenExpiresAt = expirationTime
-
-	c.orgMu.Lock()
-	c.AuthState.Organizations = organizations
-	c.orgMu.Unlock()
-
+// refreshOrganizationSecrets reads the organization keys from the profile again, to get the keys
+// of organizations that the user joined, or that another client created, since the login.
+func (c *Client) refreshOrganizationSecrets(ctx context.Context) error {
+	_, privateKey, err := c.userSession(ctx)
+	if err != nil {
+		return err
+	}
+	profile, err := c.GetProfile(ctx)
+	if err != nil {
+		return err
+	}
+	secrets, err := decryptOrganizationSecrets(profile, privateKey)
+	if err != nil {
+		return err
+	}
+	for _, secret := range secrets {
+		c.setOrganizationSecret(secret)
+	}
 	return nil
 }
 

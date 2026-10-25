@@ -4,6 +4,12 @@ FEATURES:
 
 * **New Resource:** `vaultwarden_folder` - Manage folders in the personal vault of the provider user. The name is encrypted with the user's key ([#61](https://github.com/ottramst/terraform-provider-vaultwarden/issues/61))
 * **New Data Source:** `vaultwarden_folder` - Look up a folder of the provider user by ID or name ([#61](https://github.com/ottramst/terraform-provider-vaultwarden/issues/61))
+* **New Resource:** `vaultwarden_item_login` - Manage login items, with username, password, TOTP, URIs with their match type, notes, custom fields, favorite and master password re-prompt, in the provider user's personal vault (optionally in a folder) or in an organization with `collection_ids` ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57)). New items get their own item key like current Bitwarden clients, and updates keep the password history, passkeys and attachments; a changed password is added to the password history
+* **New Resource:** `vaultwarden_item_secure_note` - Manage secure note items in the personal vault or in an organization ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
+* **New Data Source:** `vaultwarden_item_login` - Read a login item by ID ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
+* **New Data Source:** `vaultwarden_item_secure_note` - Read a secure note item by ID ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
+* **New Ephemeral Resource:** `vaultwarden_item_login` - Read a login item by ID without saving its secrets in the plan or state (Terraform 1.10 and later) ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
+* **New Ephemeral Resource:** `vaultwarden_item_secure_note` - Read a secure note item by ID without saving it in the plan or state (Terraform 1.10 and later) ([#57](https://github.com/ottramst/terraform-provider-vaultwarden/issues/57))
 
 ## v0.6.0
 
