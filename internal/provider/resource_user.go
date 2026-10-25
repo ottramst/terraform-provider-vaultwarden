@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,8 +31,9 @@ type User struct {
 
 // UserModel describes the resource data model.
 type UserModel struct {
-	Email types.String `tfsdk:"email"`
-	ID    types.String `tfsdk:"id"`
+	Email   types.String `tfsdk:"email"`
+	ID      types.String `tfsdk:"id"`
+	Enabled types.Bool   `tfsdk:"enabled"`
 }
 
 func (r *User) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -46,7 +48,8 @@ func (r *User) Schema(ctx context.Context, req resource.SchemaRequest, resp *res
 				Computed:            true,
 				MarkdownDescription: "ID of the user",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					// Without it, an in-place update would plan the ID as unknown
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"email": schema.StringAttribute{
@@ -55,6 +58,12 @@ func (r *User) Schema(ctx context.Context, req resource.SchemaRequest, resp *res
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+			},
+			"enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether the user can log in. Disabling a user also logs them out of all their devices. Defaults to `true`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(true),
 			},
 		},
 	}
@@ -104,15 +113,29 @@ func (r *User) Create(ctx context.Context, req resource.CreateRequest, resp *res
 		return
 	}
 
-	// Map response body to schema and populate Computed attribute values
+	// Map response body to schema and populate Computed attribute values. The state is saved
+	// before disabling, so that a failure there leaves the user tracked (tainted).
 	data.ID = types.StringValue(userResp.ID)
+	enabled := data.Enabled.ValueBool()
+	data.Enabled = types.BoolValue(true)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
 	tflog.Trace(ctx, fmt.Sprintf("created a new user_invite with ID: %s", data.ID))
 
-	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	// Invited users are enabled
+	if !enabled {
+		if err := r.client.SetUserEnabled(ctx, data.ID.ValueString(), false); err != nil {
+			resp.Diagnostics.AddError(
+				"Error disabling user",
+				"Could not disable user with ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+		data.Enabled = types.BoolValue(false)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	}
 }
 
 func (r *User) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -142,19 +165,36 @@ func (r *User) Read(ctx context.Context, req resource.ReadRequest, resp *resourc
 
 	// Overwrite the model with the refreshed data
 	data.Email = types.StringValue(userResp.Email)
+	if userResp.UserEnabled != nil {
+		data.Enabled = types.BoolValue(*userResp.UserEnabled)
+	} else if data.Enabled.IsNull() {
+		data.Enabled = types.BoolValue(true)
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *User) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data UserModel
+	var data, state UserModel
 
-	// Read Terraform plan data into the model
+	// Read Terraform plan and prior state data into the models
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// The email requires a replacement, so only enabled can change here
+	if !data.Enabled.Equal(state.Enabled) {
+		if err := r.client.SetUserEnabled(ctx, data.ID.ValueString(), data.Enabled.ValueBool()); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Vaultwarden user",
+				"Could not update user with ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Save updated data into Terraform state
