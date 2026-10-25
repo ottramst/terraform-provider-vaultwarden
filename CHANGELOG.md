@@ -1,7 +1,12 @@
 ## Unreleased
 
+ENHANCEMENTS:
+
+* provider: Requests that Vaultwarden rate limits (HTTP 429) are retried with exponential backoff, for up to 60 seconds in total by default ([#48](https://github.com/ottramst/terraform-provider-vaultwarden/issues/48)). The new `max_retry_wait` attribute (or `VAULTWARDEN_MAX_RETRY_WAIT`) changes the limit, and `0` disables retries. When a request still fails, the error names the Vaultwarden setting of the rate limit that was hit
+
 FEATURES:
 
+* **New Resource:** `vaultwarden_organization_policy` - Manage organization policies, such as master password requirements, two-step login, single organization and disabling Send, with their settings as JSON ([#49](https://github.com/ottramst/terraform-provider-vaultwarden/issues/49))
 * **New Resource:** `vaultwarden_organization_group` - Manage organization groups, with `name`, `access_all` and `external_id` ([#50](https://github.com/ottramst/terraform-provider-vaultwarden/issues/50)). Updates keep the group's members and collection access. Groups require the `ORG_GROUPS_ENABLED=true` server setting
 * **New Resource:** `vaultwarden_organization_group_member` - Add an organization user to a group ([#51](https://github.com/ottramst/terraform-provider-vaultwarden/issues/51)). Other members of the group and other groups of the user are left unchanged
 * **New Resource:** `vaultwarden_organization_collection_group` - Give a group access to a collection, with `read_only`, `hide_passwords` and `manage` ([#52](https://github.com/ottramst/terraform-provider-vaultwarden/issues/52)). Access of other users and groups to the collection is left unchanged
