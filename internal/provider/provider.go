@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -15,6 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
 	"os"
+	"strconv"
+	"time"
 )
 
 // Ensure VaultwardenProvider satisfies various provider interfaces.
@@ -43,6 +46,8 @@ type VaultwardenProviderModel struct {
 	// OAuth2 Authentication
 	ClientID     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
+
+	MaxRetryWait types.Int64 `tfsdk:"max_retry_wait"`
 }
 
 func (p *VaultwardenProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -117,6 +122,15 @@ func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest
 						path.MatchRoot("email"),
 						path.MatchRoot("master_password"),
 					}...),
+				},
+			},
+			"max_retry_wait": schema.Int64Attribute{
+				MarkdownDescription: "The total number of seconds a request waits for retries when Vaultwarden rate limits it (HTTP 429), " +
+					"for example when many provider instances log in from the same IP address. Retries back off exponentially. " +
+					"Set to `0` to disable retries. Defaults to `60`. Can also be set with the `VAULTWARDEN_MAX_RETRY_WAIT` environment variable.",
+				Optional: true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
 				},
 			},
 		},
@@ -200,6 +214,18 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	masterPassword := os.Getenv("VAULTWARDEN_MASTER_PASSWORD")
 	clientID := os.Getenv("VAULTWARDEN_CLIENT_ID")
 	clientSecret := os.Getenv("VAULTWARDEN_CLIENT_SECRET")
+	maxRetryWait := int64(vaultwarden.DefaultMaxRetryWait / time.Second)
+	if value := os.Getenv("VAULTWARDEN_MAX_RETRY_WAIT"); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || parsed < 0 {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("max_retry_wait"),
+				"Invalid VAULTWARDEN_MAX_RETRY_WAIT",
+				"The VAULTWARDEN_MAX_RETRY_WAIT environment variable must be a whole number of seconds, 0 or more. Got: "+value,
+			)
+		}
+		maxRetryWait = parsed
+	}
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
@@ -219,6 +245,9 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	if !data.ClientSecret.IsNull() {
 		clientSecret = data.ClientSecret.ValueString()
 	}
+	if !data.MaxRetryWait.IsNull() && !data.MaxRetryWait.IsUnknown() {
+		maxRetryWait = data.MaxRetryWait.ValueInt64()
+	}
 
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
@@ -234,7 +263,9 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	}
 
 	// Create options slice for client configuration
-	var opts []vaultwarden.ClientOption
+	opts := []vaultwarden.ClientOption{
+		vaultwarden.WithMaxRetryWait(time.Duration(maxRetryWait) * time.Second),
+	}
 
 	// Check authentication methods
 	hasAdminAuth := adminToken != ""
@@ -321,6 +352,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 		OrganizationCollectionUserResource,
 		OrganizationGroupMemberResource,
 		OrganizationGroupResource,
+		OrganizationPolicyResource,
 		OrganizationResource,
 		OrganizationUserResource,
 		UserResource,
