@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ensureAdminAuth ensures that admin authentication is valid
+// ensureAdminAuth ensures that admin authentication is valid.
 func (c *Client) ensureAdminAuth(ctx context.Context) error {
 	// Check if we have a valid admin session
 	if c.AuthState != nil && c.AuthState.AdminCookie != nil {
@@ -22,7 +22,7 @@ func (c *Client) ensureAdminAuth(ctx context.Context) error {
 	return c.adminLogin(ctx)
 }
 
-// adminLogin performs the admin authentication
+// adminLogin performs the admin authentication.
 func (c *Client) adminLogin(ctx context.Context) error {
 	// Create form data
 	form := url.Values{}

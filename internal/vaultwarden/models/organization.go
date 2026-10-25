@@ -2,7 +2,7 @@ package models
 
 import "fmt"
 
-// UserOrgStatus represents the status of a user in an organization
+// UserOrgStatus represents the status of a user in an organization.
 type UserOrgStatus int64
 
 const (
@@ -12,7 +12,7 @@ const (
 	UserOrgStatusConfirmed UserOrgStatus = 2
 )
 
-// String returns the string representation of the user org status
+// String returns the string representation of the user org status.
 func (t *UserOrgStatus) String() string {
 	switch *t {
 	case UserOrgStatusRevoked:
@@ -28,7 +28,7 @@ func (t *UserOrgStatus) String() string {
 	}
 }
 
-// FromString returns the user org status from the string representation
+// FromString returns the user org status from the string representation.
 func (t *UserOrgStatus) FromString(s string) error {
 	switch s {
 	case "Revoked":
@@ -45,7 +45,7 @@ func (t *UserOrgStatus) FromString(s string) error {
 	return nil
 }
 
-// UserOrgType represents the user organization type (access level/role)
+// UserOrgType represents the user organization type (access level/role).
 type UserOrgType int64
 
 const (
@@ -55,7 +55,7 @@ const (
 	UserOrgTypeManager UserOrgType = 3
 )
 
-// String returns the string representation of the user org type
+// String returns the string representation of the user org type.
 func (t *UserOrgType) String() string {
 	switch *t {
 	case UserOrgTypeOwner:
@@ -71,7 +71,7 @@ func (t *UserOrgType) String() string {
 	}
 }
 
-// FromString returns the user org type from the string representation
+// FromString returns the user org type from the string representation.
 func (t *UserOrgType) FromString(s string) error {
 	switch s {
 	case "Owner":
@@ -88,7 +88,7 @@ func (t *UserOrgType) FromString(s string) error {
 	return nil
 }
 
-// Organization represents a Vaultwarden organization
+// Organization represents a Vaultwarden organization.
 type Organization struct {
 	ID             string  `json:"id"`
 	Name           string  `json:"name"`
@@ -100,14 +100,14 @@ type Organization struct {
 	Enabled        bool    `json:"enabled,omitempty"`
 }
 
-// OrganizationCollections represents a list of collections in an organization
+// OrganizationCollections represents a list of collections in an organization.
 type OrganizationCollections struct {
 	ContinuationToken string       `json:"continuationToken"`
 	Data              []Collection `json:"data"`
 	Object            string       `json:"object"`
 }
 
-// OrganizationUserDetails represents a user in an organization
+// OrganizationUserDetails represents a user in an organization.
 type OrganizationUserDetails struct {
 	ID        string        `json:"id"`
 	Email     string        `json:"email"`
@@ -116,7 +116,7 @@ type OrganizationUserDetails struct {
 	AccessAll bool          `json:"accessAll"`
 }
 
-// OrganizationUsers represents a list of users in an organization
+// OrganizationUsers represents a list of users in an organization.
 type OrganizationUsers struct {
 	ContinuationToken string                    `json:"continuationToken"`
 	Data              []OrganizationUserDetails `json:"data"`

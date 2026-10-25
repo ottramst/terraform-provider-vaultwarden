@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// AuthMethod represents the type of authentication being used
+// AuthMethod represents the type of authentication being used.
 type AuthMethod int
 
 const (
@@ -26,7 +26,7 @@ type OrganizationSecret struct {
 	Name             string
 }
 
-// AuthState holds the current authentication state
+// AuthState holds the current authentication state.
 type AuthState struct {
 	// Admin authentication
 	AdminCookie *http.Cookie
@@ -41,7 +41,7 @@ type AuthState struct {
 	Organizations map[string]OrganizationSecret
 }
 
-// validateCredentials ensures that the provided credentials meet the requirements
+// validateCredentials ensures that the provided credentials meet the requirements.
 func (c *Client) validateCredentials() error {
 	if c.Credentials == nil {
 		return fmt.Errorf("no credentials provided")
@@ -69,7 +69,7 @@ func (c *Client) validateCredentials() error {
 	return nil
 }
 
-// getAuthMethod determines which authentication method to use based on the request path
+// getAuthMethod determines which authentication method to use based on the request path.
 func (c *Client) getAuthMethod(path string) (AuthMethod, error) {
 	// Use admin token for /admin endpoints
 	if strings.HasPrefix(path, "/admin") {
@@ -92,7 +92,7 @@ func (c *Client) getAuthMethod(path string) (AuthMethod, error) {
 	return AuthMethodNone, fmt.Errorf("no valid authentication method available for path: %s", path)
 }
 
-// authenticateRequest adds authentication headers/data to the request based on the auth method
+// authenticateRequest adds authentication headers/data to the request based on the auth method.
 func (c *Client) authenticateRequest(req *http.Request) error {
 	authMethod, err := c.getAuthMethod(req.URL.Path)
 	if err != nil {

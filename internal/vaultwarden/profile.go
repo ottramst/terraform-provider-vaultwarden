@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-// GetProfile retrieves the user's profile
+// GetProfile retrieves the user's profile.
 func (c *Client) GetProfile(ctx context.Context) (*models.User, error) {
 	// Ensure we have valid authentication
 	if err := c.ensureUserAuth(ctx); err != nil {

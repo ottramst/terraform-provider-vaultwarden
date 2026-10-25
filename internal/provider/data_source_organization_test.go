@@ -27,7 +27,7 @@ func TestAccOrganizationDataSource(t *testing.T) {
 	})
 }
 
-// Base configuration
+// Base configuration.
 func testAccOrganizationDataSourceConfig(name string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {

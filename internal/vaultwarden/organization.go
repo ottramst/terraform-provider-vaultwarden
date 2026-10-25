@@ -11,7 +11,7 @@ import (
 	"net/mail"
 )
 
-// CreateOrganization creates a new Vaultwarden organization
+// CreateOrganization creates a new Vaultwarden organization.
 func (c *Client) CreateOrganization(ctx context.Context, org models.Organization) (*models.Organization, error) {
 	// First ensure we have valid authentication and thus the private key
 	if err := c.ensureUserAuth(ctx); err != nil {
@@ -73,7 +73,7 @@ func (c *Client) CreateOrganization(ctx context.Context, org models.Organization
 	return &orgResp, nil
 }
 
-// GetOrganization retrieves an organization by its ID
+// GetOrganization retrieves an organization by its ID.
 func (c *Client) GetOrganization(ctx context.Context, ID string) (*models.Organization, error) {
 	if ID == "" {
 		return nil, fmt.Errorf("organization ID is required")
@@ -87,7 +87,7 @@ func (c *Client) GetOrganization(ctx context.Context, ID string) (*models.Organi
 	return &org, nil
 }
 
-// UpdateOrganization updates an organization by its ID
+// UpdateOrganization updates an organization by its ID.
 func (c *Client) UpdateOrganization(ctx context.Context, ID string, org models.Organization) (*models.Organization, error) {
 	if ID == "" {
 		return nil, fmt.Errorf("organization ID is required")
@@ -101,12 +101,12 @@ func (c *Client) UpdateOrganization(ctx context.Context, ID string, org models.O
 	return &orgResp, nil
 }
 
-// DeleteOrganizationRequest represents the request body for deleting an organization
+// DeleteOrganizationRequest represents the request body for deleting an organization.
 type DeleteOrganizationRequest struct {
 	MasterPasswordHash string `json:"masterPasswordHash"`
 }
 
-// DeleteOrganization deletes an organization by its ID
+// DeleteOrganization deletes an organization by its ID.
 func (c *Client) DeleteOrganization(ctx context.Context, ID string) error {
 	if ID == "" {
 		return fmt.Errorf("organization ID is required")
@@ -145,7 +145,7 @@ func (c *Client) DeleteOrganization(ctx context.Context, ID string) error {
 	return nil
 }
 
-// InviteOrganizationUserRequest represents the request body for inviting a user to an organization
+// InviteOrganizationUserRequest represents the request body for inviting a user to an organization.
 type InviteOrganizationUserRequest struct {
 	Emails               []string           `json:"emails"`
 	Collections          []string           `json:"collections"`
@@ -155,7 +155,7 @@ type InviteOrganizationUserRequest struct {
 	Groups               []string           `json:"groups"`
 }
 
-// InviteOrganizationUser invites a new user to an organization
+// InviteOrganizationUser invites a new user to an organization.
 func (c *Client) InviteOrganizationUser(ctx context.Context, req InviteOrganizationUserRequest, email, orgID string) error {
 	// Validate email format
 	if _, err := mail.ParseAddress(email); err != nil {
@@ -177,7 +177,7 @@ func (c *Client) InviteOrganizationUser(ctx context.Context, req InviteOrganizat
 	return nil
 }
 
-// GetOrganizationUsers retrieves all users in an organization
+// GetOrganizationUsers retrieves all users in an organization.
 func (c *Client) GetOrganizationUsers(ctx context.Context, orgID string) (*models.OrganizationUsers, error) {
 	var users models.OrganizationUsers
 	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/users", orgID), nil, &users); err != nil {
@@ -187,7 +187,7 @@ func (c *Client) GetOrganizationUsers(ctx context.Context, orgID string) (*model
 	return &users, nil
 }
 
-// GetOrganizationUserByEmail retrieves a user in an organization by their email
+// GetOrganizationUserByEmail retrieves a user in an organization by their email.
 func (c *Client) GetOrganizationUserByEmail(ctx context.Context, email, orgID string) (*models.OrganizationUserDetails, error) {
 	// First get all users in the organization
 	users, err := c.GetOrganizationUsers(ctx, orgID)
@@ -205,7 +205,7 @@ func (c *Client) GetOrganizationUserByEmail(ctx context.Context, email, orgID st
 	return nil, fmt.Errorf("user not found in organization")
 }
 
-// GetOrganizationUser retrieves a user in an organization by their ID
+// GetOrganizationUser retrieves a user in an organization by their ID.
 func (c *Client) GetOrganizationUser(ctx context.Context, userID, orgID string) (*models.OrganizationUserDetails, error) {
 	var user models.OrganizationUserDetails
 	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), nil, &user); err != nil {
@@ -215,7 +215,7 @@ func (c *Client) GetOrganizationUser(ctx context.Context, userID, orgID string) 
 	return &user, nil
 }
 
-// DeleteOrganizationUser deletes a user in an organization by their ID
+// DeleteOrganizationUser deletes a user in an organization by their ID.
 func (c *Client) DeleteOrganizationUser(ctx context.Context, userID, orgID string) error {
 	if _, err := c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), nil, nil); err != nil {
 		return fmt.Errorf("failed to delete organization user: %w", err)
@@ -224,7 +224,7 @@ func (c *Client) DeleteOrganizationUser(ctx context.Context, userID, orgID strin
 	return nil
 }
 
-// UpdateOrganizationUser updates a user in an organization by their ID
+// UpdateOrganizationUser updates a user in an organization by their ID.
 func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID string, user models.OrganizationUserDetails) (*models.OrganizationUserDetails, error) {
 	var userResp models.OrganizationUserDetails
 	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), user, &userResp); err != nil {

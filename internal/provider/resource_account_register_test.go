@@ -39,7 +39,7 @@ func TestAccAccountRegister(t *testing.T) {
 	})
 }
 
-// Base configuration
+// Base configuration.
 func testAccAccountRegisterConfig(name, email, password string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {
@@ -57,7 +57,7 @@ resource "vaultwarden_account_register" "test" {
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, name, email, password)
 }
 
-// Configuration that attempts to register a duplicate user
+// Configuration that attempts to register a duplicate user.
 func testAccAccountRegisterConfigDuplicate(name, email, password string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {

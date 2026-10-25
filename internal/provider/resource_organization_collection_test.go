@@ -63,7 +63,7 @@ func TestAccOrganizationCollection(t *testing.T) {
 	})
 }
 
-// Base configuration
+// Base configuration.
 func testAccOrganizationCollectionConfig(orgName, collectionName string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {
@@ -84,7 +84,7 @@ resource "vaultwarden_organization_collection" "test" {
 `, test.TestBaseURL, test.TestEmail, test.TestPassword, test.TestAdminToken, orgName, collectionName)
 }
 
-// Updated configuration with modified name and external_id
+// Updated configuration with modified name and external_id.
 func testAccOrganizationCollectionConfigUpdated(orgName, collectionName, externalID string) string {
 	return fmt.Sprintf(`
 provider "vaultwarden" {

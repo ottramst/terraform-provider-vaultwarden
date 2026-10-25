@@ -1,4 +1,13 @@
-## [Unreleased]
+## Unreleased
+
+BUG FIXES:
+
+* security: Updated `google.golang.org/grpc` to v1.84.0 and `golang.org/x/crypto` to v0.58.0
+
+NOTES:
+
+* build: The provider now requires Go 1.27 to build from source (Go 1.23 is end-of-life). Dependencies were updated, including `terraform-plugin-framework` v1.19.0 and `terraform-plugin-testing` v1.16.0
+* build: golangci-lint configuration migrated to v2, and golangci-lint is pinned to v2.15.0 in CI
 
 ## v0.4.4
 
