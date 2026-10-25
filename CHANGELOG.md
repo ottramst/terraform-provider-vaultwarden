@@ -1,4 +1,10 @@
-## Unreleased
+## v0.5.0
+
+BREAKING CHANGES:
+
+* resource/vaultwarden_organization_user: `access_all = true` with `type = "User"`, and `access_all = false` with `type = "Owner"` or `"Admin"`, are now rejected at plan time. Vaultwarden 1.34 and later ignore these values, which caused the error in [#41](https://github.com/ottramst/terraform-provider-vaultwarden/issues/41). Remove `access_all`, or give `User` members access to collections with `vaultwarden_organization_collection_user`
+* resource/vaultwarden_user, resource/vaultwarden_account_register, resource/vaultwarden_organization_user: Changing `email` (and `name` or `password` of an `account_register`) now plans a replacement, which deletes the user or account, including its vault. Before, the change was never applied. Review plans for `forces replacement` before applying, or use `lifecycle { prevent_destroy = true }`
+* Vaultwarden 1.35 and older are no longer tested. See the support policy in the README
 
 FEATURES:
 
