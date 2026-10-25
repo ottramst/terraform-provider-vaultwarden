@@ -1,5 +1,9 @@
 ## Unreleased
 
+ENHANCEMENTS:
+
+* provider: Requests that Vaultwarden rate limits (HTTP 429) are retried with exponential backoff, for up to 60 seconds in total by default ([#48](https://github.com/ottramst/terraform-provider-vaultwarden/issues/48)). The new `max_retry_wait` attribute (or `VAULTWARDEN_MAX_RETRY_WAIT`) changes the limit, and `0` disables retries. When a request still fails, the error names the Vaultwarden setting of the rate limit that was hit
+
 FEATURES:
 
 * **New Resource:** `vaultwarden_organization_policy` - Manage organization policies, such as master password requirements, two-step login, single organization and disabling Send, with their settings as JSON ([#49](https://github.com/ottramst/terraform-provider-vaultwarden/issues/49))
