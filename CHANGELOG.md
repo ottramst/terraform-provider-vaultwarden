@@ -1,3 +1,10 @@
+## Unreleased
+
+FEATURES:
+
+* **New Resource:** `vaultwarden_folder` - Manage folders in the personal vault of the provider user. The name is encrypted with the user's key ([#61](https://github.com/ottramst/terraform-provider-vaultwarden/issues/61))
+* **New Data Source:** `vaultwarden_folder` - Look up a folder of the provider user by ID or name ([#61](https://github.com/ottramst/terraform-provider-vaultwarden/issues/61))
+
 ## v0.6.0
 
 FEATURES:

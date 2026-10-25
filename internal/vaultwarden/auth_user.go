@@ -43,20 +43,38 @@ func (c *Client) userSession(ctx context.Context) (string, *rsa.PrivateKey, erro
 	c.authMu.Lock()
 	defer c.authMu.Unlock()
 
-	// Check if we have a valid user session
-	if c.AuthState != nil && c.AuthState.AccessToken != "" && c.AuthState.PrivateKey != nil {
-		// Check if token is not expired (with some buffer time)
-		if !c.AuthState.TokenExpiresAt.IsZero() && time.Now().Add(time.Minute).Before(c.AuthState.TokenExpiresAt) {
-			return c.AuthState.AccessToken, c.AuthState.PrivateKey, nil
-		}
-	}
-
-	// Perform user login
-	if err := c.userLogin(ctx); err != nil {
+	if err := c.ensureUserSessionLocked(ctx); err != nil {
 		return "", nil, err
 	}
 
 	return c.AuthState.AccessToken, c.AuthState.PrivateKey, nil
+}
+
+// UserKey returns the symmetric key of the provider user, which encrypts the personal vault,
+// logging in first if needed.
+func (c *Client) UserKey(ctx context.Context) (symmetrickey.Key, error) {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+
+	if err := c.ensureUserSessionLocked(ctx); err != nil {
+		return symmetrickey.Key{}, err
+	}
+
+	return *c.AuthState.UserKey, nil
+}
+
+// ensureUserSessionLocked logs in unless the current user session is valid. The caller must
+// hold authMu.
+func (c *Client) ensureUserSessionLocked(ctx context.Context) error {
+	// Check if we have a valid user session
+	if c.AuthState != nil && c.AuthState.AccessToken != "" && c.AuthState.PrivateKey != nil && c.AuthState.UserKey != nil {
+		// Check if token is not expired (with some buffer time)
+		if !c.AuthState.TokenExpiresAt.IsZero() && time.Now().Add(time.Minute).Before(c.AuthState.TokenExpiresAt) {
+			return nil
+		}
+	}
+
+	return c.userLogin(ctx)
 }
 
 // userLogin performs the user authentication. The caller must hold authMu.
@@ -166,6 +184,7 @@ func (c *Client) userLogin(ctx context.Context) error {
 	// Update auth state
 	c.AuthState.AccessToken = tokenResp.AccessToken
 	c.AuthState.PrivateKey = privateKey
+	c.AuthState.UserKey = encryptionKey
 	c.AuthState.TokenExpiresAt = expirationTime
 
 	c.orgMu.Lock()

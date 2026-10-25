@@ -35,7 +35,9 @@ type AuthState struct {
 	AccessToken    string    // JWT token
 	TokenExpiresAt time.Time // JWT expiration time
 	PrivateKey     *rsa.PrivateKey
-	KdfConfig      *models.KdfConfiguration
+	// UserKey is the user's symmetric key, which encrypts the personal vault (folders and items)
+	UserKey   *symmetrickey.Key
+	KdfConfig *models.KdfConfiguration
 
 	// Organizations data
 	Organizations map[string]OrganizationSecret
