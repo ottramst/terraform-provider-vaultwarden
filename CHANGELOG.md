@@ -1,5 +1,10 @@
 ## Unreleased
 
+ENHANCEMENTS:
+
+* resource/vaultwarden_account_register: Support import by ID. The password cannot be read back, and setting it after an import only updates the state
+* resource/vaultwarden_account_register: `name` is now computed when not set
+
 BUG FIXES:
 
 * resource/vaultwarden_organization_user: Fixed "Provider produced inconsistent result after apply" for `access_all` on Vaultwarden 1.34 and later ([#41](https://github.com/ottramst/terraform-provider-vaultwarden/issues/41)). Vaultwarden now decides `access_all` from the user type: `Owner` and `Admin` always have it, a `Manager` has it with the *Manage all collections* permission, and a `User` never has it. `access_all` now defaults from the type, and setting it to `true` for a `User` (or `false` for an `Owner` or `Admin`) is rejected at plan time. Setting `access_all = true` on a `Manager` is now applied on newer Vaultwarden versions too
@@ -7,6 +12,10 @@ BUG FIXES:
 * resource/vaultwarden_organization_user: Updates now read the user back from the server instead of copying the configuration into state
 * resource/vaultwarden_account_register: Registering accounts works again on Vaultwarden 1.36 and later, which removed the `/api/accounts/register` endpoint. The provider now uses the `/identity/accounts/register/send-verification-email` and `/identity/accounts/register/finish` flow. Registration fails with a clear error when the server requires email verification (`SIGNUPS_VERIFY`)
 * resource/vaultwarden_user: Deleting a user works again on Vaultwarden 1.37 and later
+* provider: Resources deleted outside Terraform are now removed from state and planned for creation, instead of failing the refresh. Deleting a resource that is already gone now succeeds ([#44](https://github.com/ottramst/terraform-provider-vaultwarden/issues/44))
+* resource/vaultwarden_organization_user, resource/vaultwarden_organization_collection: Updates no longer remove the collection and group assignments of the user or collection, for example ones made in the web vault ([#45](https://github.com/ottramst/terraform-provider-vaultwarden/issues/45))
+* resource/vaultwarden_user, resource/vaultwarden_account_register, resource/vaultwarden_organization_user: Changing `email` (and `name` or `password` of an `account_register`) now replaces the resource. Previously the change was reported as applied but never sent to the server. Replacing a user or a registered account deletes it, including its vault ([#46](https://github.com/ottramst/terraform-provider-vaultwarden/issues/46))
+* provider: Creating an organization no longer crashes the provider when key generation fails ([#47](https://github.com/ottramst/terraform-provider-vaultwarden/issues/47))
 * security: Updated `google.golang.org/grpc` to v1.84.0 and `golang.org/x/crypto` to v0.58.0
 
 NOTES:

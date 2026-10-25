@@ -146,6 +146,11 @@ func (r *Organization) Read(ctx context.Context, req resource.ReadRequest, resp 
 	// Get refreshed data from the client
 	orgResp, err := r.client.GetOrganization(ctx, data.ID.ValueString())
 	if err != nil {
+		// Deleted outside Terraform
+		if vaultwarden.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading Vaultwarden organization",
 			"Could not read organization with ID "+data.ID.ValueString()+": "+err.Error(),

@@ -35,13 +35,23 @@ resource "vaultwarden_account_register" "example" {
 
 ### Required
 
-- `email` (String) The email of the account to register
-- `password` (String, Sensitive) The password of the account to register
+- `email` (String) The email of the account to register. Changing it deletes the account, including its vault, and registers a new one.
+- `password` (String, Sensitive) The password of the account to register. Changing it deletes the account, including its vault, and registers a new one. The password cannot be read back, so it is not set after an import; setting it then only updates the state.
 
 ### Optional
 
-- `name` (String) The name of the account to register
+- `name` (String) The name of the account to register. Changing it deletes the account, including its vault, and registers a new one.
 
 ### Read-Only
 
 - `id` (String) ID of the registered account
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import vaultwarden_account_register.example <id>
+```

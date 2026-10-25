@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -18,6 +19,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &AccountRegister{}
 var _ resource.ResourceWithConfigure = &AccountRegister{}
+var _ resource.ResourceWithImportState = &AccountRegister{}
 
 func AccountRegisterResource() resource.Resource {
 	return &AccountRegister{}
@@ -36,6 +38,9 @@ type AccountRegisterModel struct {
 	Password types.String `tfsdk:"password"`
 }
 
+// accountReplaceWarning is appended to the descriptions of attributes that force replacement.
+const accountReplaceWarning = " Changing it deletes the account, including its vault, and registers a new one."
+
 func (r *AccountRegister) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_account_register"
 }
@@ -52,17 +57,36 @@ func (r *AccountRegister) Schema(ctx context.Context, req resource.SchemaRequest
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the account to register",
+				MarkdownDescription: "The name of the account to register." + accountReplaceWarning,
 				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"email": schema.StringAttribute{
-				MarkdownDescription: "The email of the account to register",
+				MarkdownDescription: "The email of the account to register." + accountReplaceWarning,
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "The password of the account to register",
-				Required:            true,
-				Sensitive:           true,
+				MarkdownDescription: "The password of the account to register." + accountReplaceWarning +
+					" The password cannot be read back, so it is not set after an import; setting it then only updates the state.",
+				Required:  true,
+				Sensitive: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							// Only an imported account has no password in state
+							resp.RequiresReplace = !req.StateValue.IsNull()
+						},
+						"Changing the password of a registered account requires replacing it.",
+						"Changing the password of a registered account requires replacing it.",
+					),
+				},
 			},
 		},
 	}
@@ -194,6 +218,7 @@ func (r *AccountRegister) Create(ctx context.Context, req resource.CreateRequest
 
 	// Map response body to schema and populate Computed attribute values
 	data.ID = types.StringValue(userResp.ID)
+	data.Name = types.StringValue(userResp.Name)
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -216,6 +241,11 @@ func (r *AccountRegister) Read(ctx context.Context, req resource.ReadRequest, re
 	// Get refreshed data from the client
 	userResp, err := r.client.GetUser(ctx, data.ID.ValueString())
 	if err != nil {
+		// Deleted outside Terraform
+		if vaultwarden.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading Vaultwarden user",
 			"Could not read user with ID "+data.ID.ValueString()+": "+err.Error(),
@@ -263,4 +293,8 @@ func (r *AccountRegister) Delete(ctx context.Context, req resource.DeleteRequest
 		)
 		return
 	}
+}
+
+func (r *AccountRegister) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

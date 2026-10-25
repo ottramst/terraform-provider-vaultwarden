@@ -29,7 +29,7 @@ resource "vaultwarden_organization_user" "example" {
 
 ### Required
 
-- `email` (String) The email of the user to invite
+- `email` (String) The email of the user to invite. Changing it removes the user from the organization and invites the new email.
 - `organization_id` (String) ID of the organization to invite the user to
 
 ### Optional
@@ -49,5 +49,5 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
-terraform import vaultwarden_organization_user.example <id>
+terraform import vaultwarden_organization_user.example <org_id>/<id>
 ```

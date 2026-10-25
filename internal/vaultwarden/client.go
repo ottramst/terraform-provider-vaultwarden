@@ -80,6 +80,14 @@ func New(endpoint string, opts ...ClientOption) (*Client, error) {
 	return client, nil
 }
 
+// requestURL returns the URL for path, which may include a query string.
+func (c *Client) requestURL(path string) *url.URL {
+	path, query, _ := strings.Cut(path, "?")
+	reqURL := c.endpoint.JoinPath(path)
+	reqURL.RawQuery = query
+	return reqURL
+}
+
 // prepareRequestBody prepares the request body and returns the appropriate content type.
 func prepareRequestBody(reqBody interface{}) (io.Reader, string, error) {
 	if reqBody == nil {
@@ -124,7 +132,7 @@ func (c *Client) doUnauthenticatedRequest(ctx context.Context, method, path stri
 	}
 
 	// Create request with context
-	reqURL := c.endpoint.JoinPath(path)
+	reqURL := c.requestURL(path)
 	req, err := http.NewRequestWithContext(ctx, method, reqURL.String(), bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -151,8 +159,7 @@ func (c *Client) doUnauthenticatedRequest(ctx context.Context, method, path stri
 
 	// Handle error responses
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp, fmt.Errorf("request failed with status %d: %s. Response: %s",
-			resp.StatusCode, resp.Status, string(body))
+		return resp, &APIError{StatusCode: resp.StatusCode, Status: resp.Status, Body: string(body)}
 	}
 
 	// Parse successful response if a response struct is provided
@@ -176,7 +183,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, re
 	}
 
 	// Create request with context
-	reqURL := c.endpoint.JoinPath(path)
+	reqURL := c.requestURL(path)
 	req, err := http.NewRequestWithContext(ctx, method, reqURL.String(), bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -208,8 +215,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, reqBody, re
 
 	// Handle error responses
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp, fmt.Errorf("request failed with status %d: %s. Response: %s",
-			resp.StatusCode, resp.Status, string(body))
+		return resp, &APIError{StatusCode: resp.StatusCode, Status: resp.Status, Body: string(body)}
 	}
 
 	// Parse successful response if a response struct is provided

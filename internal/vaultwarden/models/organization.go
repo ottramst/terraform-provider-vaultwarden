@@ -118,6 +118,9 @@ type OrganizationUserDetails struct {
 	// AccessAll is not returned by Vaultwarden 1.37.4 and later, see HasAccessAll.
 	AccessAll   *bool           `json:"accessAll,omitempty"`
 	Permissions map[string]bool `json:"permissions,omitempty"`
+	// Collections and Groups are only returned when requested, and only the direct assignments.
+	Collections []CollectionAccess `json:"collections,omitempty"`
+	Groups      []string           `json:"groups,omitempty"`
 }
 
 // ManageAllCollectionsPermissions are the custom role permissions that Vaultwarden

@@ -7,11 +7,13 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 )
 
 func TestAccUser(t *testing.T) {
 	// Generate a random email address for the test
 	email := gofakeit.Email()
+	newEmail := gofakeit.Email()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -29,6 +31,16 @@ func TestAccUser(t *testing.T) {
 				ResourceName:      "vaultwarden_user.test",
 				ImportState:       true,
 				ImportStateVerify: true,
+			},
+			// Changing the email replaces the user
+			{
+				Config: testAccExampleResourceConfig(newEmail),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("vaultwarden_user.test", plancheck.ResourceActionDestroyBeforeCreate),
+					},
+				},
+				Check: resource.TestCheckResourceAttr("vaultwarden_user.test", "email", newEmail),
 			},
 			// Delete testing automatically occurs in TestCase
 		},

@@ -50,8 +50,11 @@ func (r *User) Schema(ctx context.Context, req resource.SchemaRequest, resp *res
 				},
 			},
 			"email": schema.StringAttribute{
-				MarkdownDescription: "The email of the user to invite",
+				MarkdownDescription: "The email of the user to invite. Changing it deletes the user, including their vault if they accepted the invitation, and invites the new email.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -125,6 +128,11 @@ func (r *User) Read(ctx context.Context, req resource.ReadRequest, resp *resourc
 	// Get refreshed data from the client
 	userResp, err := r.client.GetUser(ctx, data.ID.ValueString())
 	if err != nil {
+		// Deleted outside Terraform
+		if vaultwarden.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading Vaultwarden user",
 			"Could not read user with ID "+data.ID.ValueString()+": "+err.Error(),

@@ -68,10 +68,11 @@ func (r *OrganizationUser) Schema(ctx context.Context, req resource.SchemaReques
 				},
 			},
 			"email": schema.StringAttribute{
-				MarkdownDescription: "The email of the user to invite",
+				MarkdownDescription: "The email of the user to invite. Changing it removes the user from the organization and invites the new email.",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"type": schema.StringAttribute{
@@ -251,6 +252,11 @@ func (r *OrganizationUser) Read(ctx context.Context, req resource.ReadRequest, r
 	// Get refreshed data from the client
 	userResp, err := r.client.GetOrganizationUser(ctx, data.ID.ValueString(), data.OrganizationID.ValueString())
 	if err != nil {
+		// Deleted outside Terraform
+		if vaultwarden.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error fetching organization user",
 			"Could not fetch organization user, unexpected error: "+err.Error(),

@@ -29,6 +29,13 @@ func TestAccAccountRegister(t *testing.T) {
 					resource.TestCheckResourceAttrSet("vaultwarden_account_register.test", "id"),
 				),
 			},
+			// ImportState testing; the password cannot be read back
+			{
+				ResourceName:            "vaultwarden_account_register.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"password"},
+			},
 			// Test duplicate registration fails
 			{
 				Config:      testAccAccountRegisterConfigDuplicate(name, email, password),
