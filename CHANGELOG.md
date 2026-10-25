@@ -7,6 +7,11 @@ ENHANCEMENTS:
 FEATURES:
 
 * **New Resource:** `vaultwarden_organization_policy` - Manage organization policies, such as master password requirements, two-step login, single organization and disabling Send, with their settings as JSON ([#49](https://github.com/ottramst/terraform-provider-vaultwarden/issues/49))
+* **New Data Source:** `vaultwarden_organization_user` - Look up a member of an organization by email or ID ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
+* **New Data Source:** `vaultwarden_organization_users` - List the members of an organization ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
+* **New Data Source:** `vaultwarden_organization_collection` - Look up a collection of an organization by name or ID. A name shared by several collections is rejected with their IDs ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
+* **New Data Source:** `vaultwarden_organization_collections` - List the collections of an organization with their decrypted names ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
+* **New Data Source:** `vaultwarden_organizations` - List the organizations the provider user is a confirmed member of ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
 
 ## v0.5.1
 

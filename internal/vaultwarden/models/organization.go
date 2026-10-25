@@ -111,10 +111,15 @@ type OrganizationCollections struct {
 
 // OrganizationUserDetails represents a user in an organization.
 type OrganizationUserDetails struct {
-	ID     string        `json:"id"`
-	Email  string        `json:"email"`
-	Status UserOrgStatus `json:"status"`
-	Type   UserOrgType   `json:"type"`
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+	Email  string `json:"email"`
+	// Name is only returned once the user has accepted the invitation.
+	Name             *string       `json:"name"`
+	ExternalID       *string       `json:"externalId"`
+	TwoFactorEnabled bool          `json:"twoFactorEnabled"`
+	Status           UserOrgStatus `json:"status"`
+	Type             UserOrgType   `json:"type"`
 	// AccessAll is not returned by Vaultwarden 1.37.4 and later, see HasAccessAll.
 	AccessAll   *bool           `json:"accessAll,omitempty"`
 	Permissions map[string]bool `json:"permissions,omitempty"`

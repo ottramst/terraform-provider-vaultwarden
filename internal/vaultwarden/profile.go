@@ -21,3 +21,19 @@ func (c *Client) GetProfile(ctx context.Context) (*models.User, error) {
 
 	return &user, nil
 }
+
+// GetOrganizationMemberships returns the organizations the user is a confirmed member of.
+func (c *Client) GetOrganizationMemberships(ctx context.Context) ([]models.OrganizationMembership, error) {
+	if err := c.ensureUserAuth(ctx); err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	var profile struct {
+		Organizations []models.OrganizationMembership `json:"organizations"`
+	}
+	if _, err := c.doRequest(ctx, http.MethodGet, "/api/accounts/profile", nil, &profile); err != nil {
+		return nil, fmt.Errorf("failed to get profile: %w", err)
+	}
+
+	return profile.Organizations, nil
+}
