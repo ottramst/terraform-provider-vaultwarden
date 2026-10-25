@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/crypt"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/encryptedstring"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"net/http"
 )
@@ -69,6 +70,38 @@ func (c *Client) GetOrganizationCollection(ctx context.Context, orgID string, co
 	}
 
 	return nil, fmt.Errorf("collection %s in organization %s: %w", collectionID, orgID, ErrNotFound)
+}
+
+// ListOrganizationCollections returns the collections of an organization with their names decrypted.
+func (c *Client) ListOrganizationCollections(ctx context.Context, orgID string) ([]models.Collection, error) {
+	var listResp models.OrganizationCollections
+	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/collections", orgID), nil, &listResp); err != nil {
+		if c.organizationGone(ctx, orgID, err) {
+			return nil, fmt.Errorf("organization %s: %w", orgID, ErrNotFound)
+		}
+		return nil, fmt.Errorf("failed to list organization collections: %w", err)
+	}
+
+	orgSecret, exists := c.OrganizationSecret(orgID)
+	if !exists {
+		return nil, fmt.Errorf("the key of organization %s is not available: the provider user is not a confirmed member of it", orgID)
+	}
+
+	collections := make([]models.Collection, 0, len(listResp.Data))
+	for _, collection := range listResp.Data {
+		encryptedName, err := encryptedstring.NewFromEncryptedValue(collection.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the name of collection %s: %w", collection.ID, err)
+		}
+		name, err := crypt.Decrypt(encryptedName, &orgSecret.Key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt the name of collection %s: %w", collection.ID, err)
+		}
+		collection.Name = string(name)
+		collections = append(collections, collection)
+	}
+
+	return collections, nil
 }
 
 // GetOrganizationCollectionAccess returns the users and groups assigned to a collection.

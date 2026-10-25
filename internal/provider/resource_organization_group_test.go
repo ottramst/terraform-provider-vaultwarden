@@ -184,7 +184,25 @@ data "vaultwarden_organization_group" "missing" {
   depends_on = [vaultwarden_organization_group.test]
 }
 `,
-				ExpectError: regexp.MustCompile(`Organization group not found`),
+				ExpectError: regexp.MustCompile(`Organization Group Not Found`),
+			},
+			{
+				Config: testAccOrganizationGroupConfig(orgName, `
+  name = "Engineering"
+`) + `
+resource "vaultwarden_organization_group" "other" {
+  organization_id = vaultwarden_organization.test.id
+  name            = "Engineering"
+}
+
+data "vaultwarden_organization_group" "ambiguous" {
+  organization_id = vaultwarden_organization.test.id
+  name            = "Engineering"
+
+  depends_on = [vaultwarden_organization_group.test, vaultwarden_organization_group.other]
+}
+`,
+				ExpectError: regexp.MustCompile(`Multiple Organization Groups Found`),
 			},
 		},
 	})
