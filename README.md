@@ -11,14 +11,27 @@ The Vaultwarden provider allows you to manage and configure [Vaultwarden](https:
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.8
 - [Go](https://golang.org/doc/install) >= 1.27
 
-## Getting started
+## Vaultwarden version compatibility
 
-The provider supports Vaultwarden versions:
-* 1.32.x
-* 1.31.x
-* 1.30.x
-* 1.29.x
-* 1.28.x
+Acceptance tests run in CI against **Vaultwarden 1.36.0** and **1.37.4** across Terraform 1.16 and 1.17.
+
+### Support policy
+
+Vaultwarden only ships fixes for its newest release, so the provider fully supports, and tests the latest patch of, the two newest Vaultwarden minor releases:
+
+| Release line | Provider support |
+| --- | --- |
+| 1.37.x | Supported, tested in CI |
+| 1.36.x | Supported, tested in CI |
+| 1.35.x and older | Best effort |
+
+*Best effort* means the provider may still work, but these versions are not tested in CI, and a bug that only reproduces on them may not be fixed. Upgrading Vaultwarden is the recommended remedy.
+
+At configure time the provider makes an unauthenticated `GET {endpoint}/api/version` request and warns when the server is older than the supported versions.
+
+Terraform follows the same policy. HashiCorp supports the two newest Terraform minor releases, currently **1.17** and **1.16**, and CI tests those. The provider uses plugin protocol 6, so it still works with older Terraform 1.x releases, but EOL Terraform versions are supported on a best-effort basis only.
+
+## Getting started
 
 For proper provider functionality, your Vaultwarden instance must have admin access configured. See Vaultwarden's Admin Page documentation for setup instructions.
 Access to the admin API is granted via passing the `admin_token` to the provider configuration. If this is not provided, the provider will not be able to manage the `/admin` endpoints.
@@ -241,12 +254,20 @@ make generate
 
 ### Running acceptance tests
 
-Acceptance tests require Vaultwarden server to be running.
-Makefile is provided to run the acceptance tests:
+Acceptance tests run against a real Vaultwarden instance. A Docker Compose file is provided; `VW_VERSION` selects the image tag and defaults to the newest supported version.
 
 ```shell
-make docker-testacc
+docker compose up -d --wait
+# VW_VERSION=1.36.0 docker compose up -d --wait
+
+make testacc
+# or a single test:
+TF_ACC=1 go test -v -run TestAccOrganizationUser ./internal/provider/ -timeout 120m
+
+docker compose down
 ```
+
+The tests use `http://localhost:8000` by default; set `VAULTWARDEN_ENDPOINT` to use another instance. That instance needs the admin token `admin_token`, and generous `ADMIN_RATELIMIT_*`, `LOGIN_RATELIMIT_*` and `UNAUTHENTICATED_RATELIMIT_*` limits (see `docker-compose.yml`).
 
 ## Support
 

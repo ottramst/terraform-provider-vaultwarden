@@ -3,12 +3,15 @@
 page_title: "vaultwarden Provider"
 description: |-
   The Vaultwarden provider allows you to interact with a Vaultwarden server.
+  It supports and is tested against the latest two Vaultwarden minor releases, currently 1.36.x and 1.37.x; older Vaultwarden versions get best-effort support only, and the provider warns when it detects one.
   More information about authentication methods can be found in the provider repository https://github.com/ottramst/terraform-provider-vaultwarden#authentication
 ---
 
 # vaultwarden Provider
 
 The Vaultwarden provider allows you to interact with a Vaultwarden server.
+
+It supports and is tested against the latest two Vaultwarden minor releases, currently 1.36.x and 1.37.x; older Vaultwarden versions get best-effort support only, and the provider warns when it detects one.
 
 More information about authentication methods can be found in the [provider repository](https://github.com/ottramst/terraform-provider-vaultwarden#authentication)
 

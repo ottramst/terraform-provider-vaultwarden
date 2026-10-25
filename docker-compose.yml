@@ -1,0 +1,26 @@
+# Local Vaultwarden for acceptance tests. VW_VERSION selects the image tag and
+# defaults to the newest supported release; keep it in sync with the test
+# matrix in .github/workflows/test.yml.
+services:
+  vaultwarden:
+    image: vaultwarden/server:${VW_VERSION:-1.37.4}-alpine
+    environment:
+      ROCKET_PORT: "8000"
+      ADMIN_TOKEN: admin_token
+      # The acceptance tests log in and register accounts far more often than
+      # the defaults allow.
+      ADMIN_RATELIMIT_MAX_BURST: "1000"
+      ADMIN_RATELIMIT_SECONDS: "1"
+      LOGIN_RATELIMIT_MAX_BURST: "1000"
+      LOGIN_RATELIMIT_SECONDS: "1"
+      UNAUTHENTICATED_RATELIMIT_MAX_BURST: "1000"
+      UNAUTHENTICATED_RATELIMIT_SECONDS: "1"
+    ports:
+      - "8000:8000"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/alive"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

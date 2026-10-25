@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
 	"os"
 )
@@ -51,6 +53,8 @@ func (p *VaultwardenProvider) Metadata(_ context.Context, _ provider.MetadataReq
 func (p *VaultwardenProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "The Vaultwarden provider allows you to interact with a Vaultwarden server.\n\n" +
+			"It supports and is tested against the latest two Vaultwarden minor releases, currently 1.36.x and 1.37.x; " +
+			"older Vaultwarden versions get best-effort support only, and the provider warns when it detects one.\n\n" +
 			"More information about authentication methods can be found in the [provider repository](https://github.com/ottramst/terraform-provider-vaultwarden#authentication)",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
@@ -278,6 +282,23 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 				"Vaultwarden Client Error: "+err.Error(),
 		)
 		return
+	}
+
+	// Warn when the server is older than the supported versions. A failed probe is not
+	// fatal: the provider has no version-dependent behavior.
+	if serverVersion, err := client.GetServerVersion(ctx); err != nil {
+		tflog.Warn(ctx, "could not detect the Vaultwarden server version", map[string]interface{}{"error": err.Error()})
+	} else if supported, err := vaultwarden.IsSupportedVersion(serverVersion); err != nil {
+		tflog.Warn(ctx, "could not parse the Vaultwarden server version", map[string]interface{}{"version": serverVersion})
+	} else if !supported {
+		resp.Diagnostics.AddWarning(
+			"Unsupported Vaultwarden version",
+			fmt.Sprintf("The Vaultwarden server at %s runs version %s. The provider supports Vaultwarden %s and newer; "+
+				"older versions get best-effort support only. Upgrading Vaultwarden is recommended.",
+				endpoint, serverVersion, vaultwarden.MinimumSupportedVersion),
+		)
+	} else {
+		tflog.Info(ctx, "detected Vaultwarden server version", map[string]interface{}{"version": serverVersion})
 	}
 
 	// Make the Vaultwarden client available during DataSource and Resource

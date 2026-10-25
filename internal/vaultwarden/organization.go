@@ -153,6 +153,25 @@ type InviteOrganizationUserRequest struct {
 	AccessSecretsManager bool               `json:"accessSecretsManager"`
 	Type                 models.UserOrgType `json:"type"`
 	Groups               []string           `json:"groups"`
+	Permissions          map[string]bool    `json:"permissions,omitempty"`
+}
+
+// UpdateOrganizationUserRequest represents the request body for updating a user in an organization.
+type UpdateOrganizationUserRequest struct {
+	Type        models.UserOrgType `json:"type"`
+	AccessAll   bool               `json:"accessAll"`
+	Permissions map[string]bool    `json:"permissions,omitempty"`
+}
+
+// OrganizationUserRole returns the type and permissions to send for a role. Vaultwarden 1.34+
+// ignores accessAll and only grants a manager access to all collections when it is sent as a
+// custom role with the manage-all-collections permissions.
+func OrganizationUserRole(userType models.UserOrgType, accessAll bool) (models.UserOrgType, map[string]bool) {
+	if userType == models.UserOrgTypeManager && accessAll {
+		return models.UserOrgTypeCustom, models.ManageAllCollectionsPermissions
+	}
+
+	return userType, nil
 }
 
 // InviteOrganizationUser invites a new user to an organization.
@@ -225,11 +244,10 @@ func (c *Client) DeleteOrganizationUser(ctx context.Context, userID, orgID strin
 }
 
 // UpdateOrganizationUser updates a user in an organization by their ID.
-func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID string, user models.OrganizationUserDetails) (*models.OrganizationUserDetails, error) {
-	var userResp models.OrganizationUserDetails
-	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), user, &userResp); err != nil {
-		return nil, fmt.Errorf("failed to update organization user: %w", err)
+func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID string, req UpdateOrganizationUserRequest) error {
+	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), req, nil); err != nil {
+		return fmt.Errorf("failed to update organization user: %w", err)
 	}
 
-	return &userResp, nil
+	return nil
 }

@@ -53,6 +53,8 @@ const (
 	UserOrgTypeAdmin   UserOrgType = 1
 	UserOrgTypeUser    UserOrgType = 2
 	UserOrgTypeManager UserOrgType = 3
+	// UserOrgTypeCustom is the custom role. Vaultwarden 1.33+ reports managers with this type.
+	UserOrgTypeCustom UserOrgType = 4
 )
 
 // String returns the string representation of the user org type.
@@ -64,7 +66,7 @@ func (t *UserOrgType) String() string {
 		return "Admin"
 	case UserOrgTypeUser:
 		return "User"
-	case UserOrgTypeManager:
+	case UserOrgTypeManager, UserOrgTypeCustom:
 		return "Manager"
 	default:
 		return "Unknown"
@@ -109,11 +111,43 @@ type OrganizationCollections struct {
 
 // OrganizationUserDetails represents a user in an organization.
 type OrganizationUserDetails struct {
-	ID        string        `json:"id"`
-	Email     string        `json:"email"`
-	Status    UserOrgStatus `json:"status"`
-	Type      UserOrgType   `json:"type"`
-	AccessAll bool          `json:"accessAll"`
+	ID     string        `json:"id"`
+	Email  string        `json:"email"`
+	Status UserOrgStatus `json:"status"`
+	Type   UserOrgType   `json:"type"`
+	// AccessAll is not returned by Vaultwarden 1.37.4 and later, see HasAccessAll.
+	AccessAll   *bool           `json:"accessAll,omitempty"`
+	Permissions map[string]bool `json:"permissions,omitempty"`
+}
+
+// ManageAllCollectionsPermissions are the custom role permissions that Vaultwarden
+// treats as access to all collections for a manager.
+var ManageAllCollectionsPermissions = map[string]bool{
+	"createNewCollections": true,
+	"editAnyCollection":    true,
+	"deleteAnyCollection":  true,
+}
+
+// HasAccessAll reports whether the user has access to all collections. Older Vaultwarden
+// versions return it directly; newer versions derive it from the type and permissions.
+func (u *OrganizationUserDetails) HasAccessAll() bool {
+	if u.AccessAll != nil {
+		return *u.AccessAll
+	}
+
+	switch u.Type {
+	case UserOrgTypeOwner, UserOrgTypeAdmin:
+		return true
+	case UserOrgTypeManager, UserOrgTypeCustom:
+		for permission := range ManageAllCollectionsPermissions {
+			if !u.Permissions[permission] {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 // OrganizationUsers represents a list of users in an organization.
