@@ -12,6 +12,8 @@ FEATURES:
 * **New Data Source:** `vaultwarden_organization_collection` - Look up a collection of an organization by name or ID. A name shared by several collections is rejected with their IDs ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
 * **New Data Source:** `vaultwarden_organization_collections` - List the collections of an organization with their decrypted names ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
 * **New Data Source:** `vaultwarden_organizations` - List the organizations the provider user is a confirmed member of ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
+* **New Data Source:** `vaultwarden_user` - Look up a user of the server by email or ID with the admin API, including whether they are enabled, invited and have two-step login, and their organizations ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
+* **New Data Source:** `vaultwarden_users` - List all users of the server with the admin API, including when they were last active ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
 
 ## v0.5.1
 
