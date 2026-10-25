@@ -7,4 +7,6 @@ type User struct {
 	Key           string         `json:"key"`
 	PrivateKey    string         `json:"privateKey"`
 	Organizations []Organization `json:"organizations,omitempty"`
+	// UserEnabled is only returned by the admin API.
+	UserEnabled *bool `json:"userEnabled,omitempty"`
 }

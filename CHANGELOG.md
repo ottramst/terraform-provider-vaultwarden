@@ -18,6 +18,10 @@ FEATURES:
 * **New Data Source:** `vaultwarden_user` - Look up a user of the server by email or ID with the admin API, including whether they are enabled, invited and have two-step login, and their organizations ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
 * **New Data Source:** `vaultwarden_users` - List all users of the server with the admin API, including when they were last active ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
 
+ENHANCEMENTS:
+
+* resource/vaultwarden_user: New `enabled` attribute to disable and enable a user. Disabling a user also logs them out of all their devices. A user disabled or enabled outside Terraform is set back on the next apply ([#56](https://github.com/ottramst/terraform-provider-vaultwarden/issues/56))
+
 ## v0.5.1
 
 BUG FIXES:
