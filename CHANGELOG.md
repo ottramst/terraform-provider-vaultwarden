@@ -1,17 +1,10 @@
-## Unreleased
-
-ENHANCEMENTS:
-
-* provider: Requests that Vaultwarden rate limits (HTTP 429) are retried with exponential backoff, for up to 60 seconds in total by default ([#48](https://github.com/ottramst/terraform-provider-vaultwarden/issues/48)). The new `max_retry_wait` attribute (or `VAULTWARDEN_MAX_RETRY_WAIT`) changes the limit, and `0` disables retries. When a request still fails, the error names the Vaultwarden setting of the rate limit that was hit
-* resource/vaultwarden_organization_user: New `auto_confirm` attribute. When `true`, a user that accepted the invitation is confirmed by encrypting the organization key with their public key, so that they can decrypt the organization's items. While the user is still invited nothing changes; once they accepted, the next plan shows `status` changing and the apply confirms them ([#53](https://github.com/ottramst/terraform-provider-vaultwarden/issues/53))
-* resource/vaultwarden_organization_user: New `revoked` attribute to revoke a user's access to the organization and restore it. A restored user gets back the status they had before ([#53](https://github.com/ottramst/terraform-provider-vaultwarden/issues/53))
-* resource/vaultwarden_organization_user: Updates that only change `auto_confirm` or `revoked` no longer send the user's role again
-* resource/vaultwarden_user: New `enabled` attribute to disable and enable a user. Disabling a user also logs them out of all their devices. A user disabled or enabled outside Terraform is set back on the next apply ([#56](https://github.com/ottramst/terraform-provider-vaultwarden/issues/56))
+## v0.6.0
 
 FEATURES:
 
 * **New Resource:** `vaultwarden_organization_policy` - Manage organization policies, such as master password requirements, two-step login, single organization and disabling Send, with their settings as JSON ([#49](https://github.com/ottramst/terraform-provider-vaultwarden/issues/49))
 * **New Resource:** `vaultwarden_organization_group` - Manage organization groups, with `name`, `access_all` and `external_id` ([#50](https://github.com/ottramst/terraform-provider-vaultwarden/issues/50)). Updates keep the group's members and collection access. Groups require the `ORG_GROUPS_ENABLED=true` server setting
+* **New Data Source:** `vaultwarden_organization_group` - Look up an organization group by ID or name ([#50](https://github.com/ottramst/terraform-provider-vaultwarden/issues/50))
 * **New Resource:** `vaultwarden_organization_group_member` - Add an organization user to a group ([#51](https://github.com/ottramst/terraform-provider-vaultwarden/issues/51)). Other members of the group and other groups of the user are left unchanged
 * **New Resource:** `vaultwarden_organization_collection_group` - Give a group access to a collection, with `read_only`, `hide_passwords` and `manage` ([#52](https://github.com/ottramst/terraform-provider-vaultwarden/issues/52)). Access of other users and groups to the collection is left unchanged
 * **New Data Source:** `vaultwarden_organization_user` - Look up a member of an organization by email or ID ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
@@ -21,7 +14,14 @@ FEATURES:
 * **New Data Source:** `vaultwarden_organizations` - List the organizations the provider user is a confirmed member of ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
 * **New Data Source:** `vaultwarden_user` - Look up a user of the server by email or ID with the admin API, including whether they are enabled, invited and have two-step login, and their organizations ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
 * **New Data Source:** `vaultwarden_users` - List all users of the server with the admin API, including when they were last active ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
-* **New Data Source:** `vaultwarden_organization_group` - Look up an organization group by ID or name ([#50](https://github.com/ottramst/terraform-provider-vaultwarden/issues/50))
+
+ENHANCEMENTS:
+
+* provider: Requests that Vaultwarden rate limits (HTTP 429) are retried with exponential backoff, for up to 60 seconds in total by default ([#48](https://github.com/ottramst/terraform-provider-vaultwarden/issues/48)). The new `max_retry_wait` attribute (or `VAULTWARDEN_MAX_RETRY_WAIT`) changes the limit, and `0` disables retries. When a request still fails, the error names the Vaultwarden setting of the rate limit that was hit
+* resource/vaultwarden_organization_user: New `auto_confirm` attribute. When `true`, a user that accepted the invitation is confirmed by encrypting the organization key with their public key, so that they can decrypt the organization's items. While the user is still invited nothing changes; once they accepted, the next plan shows `status` changing and the apply confirms them ([#53](https://github.com/ottramst/terraform-provider-vaultwarden/issues/53))
+* resource/vaultwarden_organization_user: New `revoked` attribute to revoke a user's access to the organization and restore it. A restored user gets back the status they had before ([#53](https://github.com/ottramst/terraform-provider-vaultwarden/issues/53))
+* resource/vaultwarden_organization_user: Updates that only change `auto_confirm` or `revoked` no longer send the user's role again
+* resource/vaultwarden_user: New `enabled` attribute to disable and enable a user. Disabling a user also logs them out of all their devices. A user disabled or enabled outside Terraform is set back on the next apply ([#56](https://github.com/ottramst/terraform-provider-vaultwarden/issues/56))
 
 ## v0.5.1
 
