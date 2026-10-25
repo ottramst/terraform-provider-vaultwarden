@@ -102,41 +102,15 @@ func (c *Client) UpdateOrganization(ctx context.Context, ID string, org models.O
 	return &orgResp, nil
 }
 
-// DeleteOrganizationRequest represents the request body for deleting an organization.
-type DeleteOrganizationRequest struct {
-	MasterPasswordHash string `json:"masterPasswordHash"`
-}
-
 // DeleteOrganization deletes an organization by its ID.
 func (c *Client) DeleteOrganization(ctx context.Context, ID string) error {
 	if ID == "" {
 		return fmt.Errorf("organization ID is required")
 	}
 
-	// Do a prelogin to fetch KDF parameters
-	preloginResp, err := c.PreLogin(ctx)
+	body, err := c.passwordVerification(ctx)
 	if err != nil {
-		return fmt.Errorf("prelogin failed: %w", err)
-	}
-
-	// Create KDF configuration
-	kdfConfig := &models.KdfConfiguration{
-		KdfType:        preloginResp.Kdf,
-		KdfIterations:  preloginResp.KdfIterations,
-		KdfMemory:      preloginResp.KdfMemory,
-		KdfParallelism: preloginResp.KdfParallelism,
-	}
-
-	preloginKey, err := keybuilder.BuildPreloginKey(c.Credentials.MasterPassword, c.Credentials.Email, kdfConfig)
-	if err != nil {
-		return fmt.Errorf("failed to build prelogin key: %w", err)
-	}
-
-	// Step 3: Hash password
-	hashedPassword := crypt.HashPassword(c.Credentials.MasterPassword, *preloginKey, false)
-
-	body := DeleteOrganizationRequest{
-		MasterPasswordHash: hashedPassword,
+		return err
 	}
 
 	if _, err := c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/organizations/%s", ID), body, nil); err != nil {

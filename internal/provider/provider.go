@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -23,6 +24,7 @@ import (
 // Ensure VaultwardenProvider satisfies various provider interfaces.
 var _ provider.Provider = &VaultwardenProvider{}
 var _ provider.ProviderWithFunctions = &VaultwardenProvider{}
+var _ provider.ProviderWithEphemeralResources = &VaultwardenProvider{}
 
 // VaultwardenProvider defines the provider implementation.
 type VaultwardenProvider struct {
@@ -343,11 +345,13 @@ func (p *VaultwardenProvider) Configure(ctx context.Context, req provider.Config
 	// type Configure methods.
 	resp.DataSourceData = client
 	resp.ResourceData = client
+	resp.EphemeralResourceData = client
 }
 
 func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		AccountRegisterResource,
+		OrganizationAPIKeyRotationResource,
 		OrganizationCollectionResource,
 		OrganizationCollectionGroupResource,
 		OrganizationCollectionUserResource,
@@ -371,6 +375,13 @@ func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasour
 		NewOrganizationUsersDataSource,
 		NewUserDataSource,
 		NewUsersDataSource,
+	}
+}
+
+func (p *VaultwardenProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
+	return []func() ephemeral.EphemeralResource{
+		NewOrganizationAPIKeyEphemeralResource,
+		NewUserAPIKeyEphemeralResource,
 	}
 }
 

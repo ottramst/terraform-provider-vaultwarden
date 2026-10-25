@@ -98,6 +98,7 @@ For usage examples and comprehensive documentation, including all authentication
 - [Provider documentation](docs/index.md) for configuration details
 - [Resource documentation](docs/resources/) for available resources
 - [Data source documentation](docs/data-sources/) for available data sources
+- [Ephemeral resource documentation](docs/ephemeral-resources/) for secrets that are not stored in state (Terraform 1.10+)
 - [Example configurations](examples/) for complete working examples
 
 ## Developing the Provider

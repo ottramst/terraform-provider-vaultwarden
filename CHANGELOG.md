@@ -1,3 +1,11 @@
+## Unreleased
+
+FEATURES:
+
+* **New Ephemeral Resource:** `vaultwarden_organization_api_key` - Read an organization's API key (`client_id` and `client_secret`) for the public API and Directory Connector, without storing it in the plan or state. Requires Terraform 1.10 or later, and the `Owner` role on Vaultwarden 1.37 (1.36 also allows `Admin`) ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+* **New Ephemeral Resource:** `vaultwarden_user_api_key` - Read the provider user's personal API key without storing it in the plan or state ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+* **New Resource:** `vaultwarden_organization_api_key_rotation` - Rotate an organization's API key when the resource is created or its `triggers` change, for example on a `time_rotating` schedule. The new key is read with the `vaultwarden_organization_api_key` ephemeral resource ([#59](https://github.com/ottramst/terraform-provider-vaultwarden/issues/59))
+
 ## v0.6.0
 
 FEATURES:
