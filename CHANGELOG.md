@@ -3,6 +3,7 @@
 FEATURES:
 
 * **New Resource:** `vaultwarden_organization_group` - Manage organization groups, with `name`, `access_all` and `external_id` ([#50](https://github.com/ottramst/terraform-provider-vaultwarden/issues/50)). Updates keep the group's members and collection access. Groups require the `ORG_GROUPS_ENABLED=true` server setting
+* **New Resource:** `vaultwarden_organization_group_member` - Add an organization user to a group ([#51](https://github.com/ottramst/terraform-provider-vaultwarden/issues/51)). Other members of the group and other groups of the user are left unchanged
 * **New Data Source:** `vaultwarden_organization_group` - Look up an organization group by ID or name ([#50](https://github.com/ottramst/terraform-provider-vaultwarden/issues/50))
 
 ## v0.5.1

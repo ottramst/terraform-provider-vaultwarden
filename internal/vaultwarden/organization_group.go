@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
@@ -145,4 +146,64 @@ func (c *Client) DeleteOrganizationGroup(ctx context.Context, orgID, groupID str
 	}
 
 	return nil
+}
+
+// GetOrganizationGroupMember returns ErrNotFound unless the organization user is a member of the group.
+func (c *Client) GetOrganizationGroupMember(ctx context.Context, orgID, groupID, userID string) error {
+	members, err := c.GetOrganizationGroupMembers(ctx, orgID, groupID)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(members, userID) {
+		return fmt.Errorf("organization user %s in group %s: %w", userID, groupID, ErrNotFound)
+	}
+
+	return nil
+}
+
+// AddOrganizationGroupMember adds an organization user to a group. The other members of the
+// group and the other groups of the user are preserved.
+func (c *Client) AddOrganizationGroupMember(ctx context.Context, orgID, groupID, userID string) error {
+	defer c.lockOrganizationAccess(orgID)()
+
+	// Also checks that the group exists: Vaultwarden 1.36 does not validate the groups sent
+	members, err := c.GetOrganizationGroupMembers(ctx, orgID, groupID)
+	if err != nil {
+		return err
+	}
+	if slices.Contains(members, userID) {
+		return nil
+	}
+
+	return c.setOrganizationUserGroups(ctx, orgID, userID, func(groups []string) []string {
+		return append(groups, groupID)
+	})
+}
+
+// RemoveOrganizationGroupMember removes an organization user from a group. The other members of
+// the group and the other groups of the user are preserved.
+func (c *Client) RemoveOrganizationGroupMember(ctx context.Context, orgID, groupID, userID string) error {
+	defer c.lockOrganizationAccess(orgID)()
+
+	members, err := c.GetOrganizationGroupMembers(ctx, orgID, groupID)
+	if err != nil {
+		// Group or organization already deleted
+		if IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if !slices.Contains(members, userID) {
+		return nil
+	}
+
+	err = c.setOrganizationUserGroups(ctx, orgID, userID, func(groups []string) []string {
+		return slices.DeleteFunc(groups, func(id string) bool { return id == groupID })
+	})
+	// Organization user already removed
+	if IsNotFound(err) {
+		return nil
+	}
+
+	return err
 }

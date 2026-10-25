@@ -9,6 +9,7 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"net/http"
 	"net/mail"
+	"slices"
 )
 
 // CreateOrganization creates a new Vaultwarden organization.
@@ -299,12 +300,38 @@ func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID strin
 	if err != nil {
 		return err
 	}
+	req.Groups = current.Groups
 
+	return c.putOrganizationUser(ctx, orgID, userID, req)
+}
+
+// setOrganizationUserGroups replaces the groups of an organization user with the result of
+// update. The user's type, permissions and collection assignments are preserved. The caller
+// must hold lockOrganizationAccess(orgID).
+func (c *Client) setOrganizationUserGroups(ctx context.Context, orgID, userID string, update func(groups []string) []string) error {
+	current, err := c.GetOrganizationUser(ctx, userID, orgID)
+	if err != nil {
+		return err
+	}
+
+	// Send the type and permissions as returned: Vaultwarden derives access to all
+	// collections from the custom role (type 4) and its permissions
+	return c.putOrganizationUser(ctx, orgID, userID, UpdateOrganizationUserRequest{
+		Type:        current.Type,
+		AccessAll:   current.HasAccessAll(),
+		Permissions: current.Permissions,
+		Groups:      update(slices.Clone(current.Groups)),
+	})
+}
+
+// putOrganizationUser sends req with the user's current collection assignments, which
+// Vaultwarden would otherwise remove. The caller must hold lockOrganizationAccess(orgID).
+func (c *Client) putOrganizationUser(ctx context.Context, orgID, userID string, req UpdateOrganizationUserRequest) error {
+	var err error
 	req.Collections, err = c.getOrganizationUserCollectionAccess(ctx, orgID, userID)
 	if err != nil {
 		return err
 	}
-	req.Groups = current.Groups
 	if req.Groups == nil {
 		req.Groups = []string{}
 	}
