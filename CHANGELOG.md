@@ -1,3 +1,13 @@
+## Unreleased
+
+ENHANCEMENTS:
+
+* resource/vaultwarden_account_register: New write-only `password_wo` attribute, with `password_wo_version`, to register an account without storing its password in the plan or state. Requires Terraform 1.11 or later. Exactly one of `password` and `password_wo` must be set; existing configurations with `password` keep working unchanged. Changing `password_wo_version` registers the account again, like changing `password`. Moving the same password from `password` to `password_wo` updates the state without replacing the account ([#58](https://github.com/ottramst/terraform-provider-vaultwarden/issues/58))
+
+BUG FIXES:
+
+* resource/vaultwarden_account_register: Setting `password` after an import no longer replaces the account. Any in-place update planned the account ID as unknown, which forced a replacement
+
 ## v0.6.0
 
 FEATURES:

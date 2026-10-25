@@ -3,11 +3,15 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
@@ -36,6 +40,9 @@ type AccountRegisterModel struct {
 	Name     types.String `tfsdk:"name"`
 	Email    types.String `tfsdk:"email"`
 	Password types.String `tfsdk:"password"`
+	// PasswordWO is write-only: it is only set in the configuration, never in the plan or state
+	PasswordWO        types.String `tfsdk:"password_wo"`
+	PasswordWOVersion types.Int64  `tfsdk:"password_wo_version"`
 }
 
 // accountReplaceWarning is appended to the descriptions of attributes that force replacement.
@@ -47,13 +54,17 @@ func (r *AccountRegister) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *AccountRegister) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "This resource registers a new account on the Vaultwarden server.\n\nThis resource will save the password in plain text to the state! Use caution!\n\nRequires `admin_token` to be set in the provider configuration.",
+		MarkdownDescription: "This resource registers a new account on the Vaultwarden server.\n\n" +
+			"`password` is saved in plain text to the state. With Terraform 1.11 and later, use the write-only `password_wo` " +
+			"with `password_wo_version` instead, which are never stored.\n\nRequires `admin_token` to be set in the provider configuration.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "ID of the registered account",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					// Without it, an in-place update would plan the ID as unknown, and an unknown
+					// ID used to force a replacement
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -73,23 +84,74 @@ func (r *AccountRegister) Schema(ctx context.Context, req resource.SchemaRequest
 				},
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "The password of the account to register." + accountReplaceWarning +
-					" The password cannot be read back, so it is not set after an import; setting it then only updates the state.",
-				Required:  true,
+				MarkdownDescription: "The password of the account to register. It is stored in plain text in the state: " +
+					"with Terraform 1.11 and later, use `password_wo` instead. Exactly one of `password` and `password_wo` must be set." +
+					accountReplaceWarning +
+					" The password cannot be read back, so it is not set after an import; setting it then only updates the state." +
+					" Moving the same password to `password_wo` does not replace the account.",
+				Optional:  true,
 				Sensitive: true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRoot("password_wo")),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIf(
-						func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
-							// Only an imported account has no password in state
-							resp.RequiresReplace = !req.StateValue.IsNull()
-						},
+						accountPasswordRequiresReplace,
 						"Changing the password of a registered account requires replacing it.",
 						"Changing the password of a registered account requires replacing it.",
 					),
 				},
 			},
+			"password_wo": schema.StringAttribute{
+				MarkdownDescription: "The password of the account to register, as a write-only attribute that is never stored " +
+					"in the plan or state. Requires Terraform 1.11 or later. Exactly one of `password` and `password_wo` must be set. " +
+					"Terraform cannot detect changes of a write-only value: change `password_wo_version` to register the account " +
+					"again with a new password.",
+				Optional:  true,
+				Sensitive: true,
+				WriteOnly: true,
+			},
+			"password_wo_version": schema.Int64Attribute{
+				MarkdownDescription: "Version of `password_wo`. Changing it deletes the account, including its vault, and " +
+					"registers a new one with the current `password_wo`. Setting it for the first time, for example after an " +
+					"import or when moving from `password` to `password_wo`, only updates the state.",
+				Optional: true,
+				Validators: []validator.Int64{
+					int64validator.AlsoRequires(path.MatchRoot("password_wo")),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+							// Only a changed version replaces the account. There is no version in state after an
+							// import or a move from password, and none in the plan after a move back to password.
+							resp.RequiresReplace = !req.StateValue.IsNull() && !req.PlanValue.IsNull() && !req.PlanValue.Equal(req.StateValue)
+						},
+						"Changing the password version of a registered account replaces it with the current password_wo.",
+						"Changing the password version of a registered account replaces it with the current `password_wo`.",
+					),
+				},
+			},
 		},
 	}
+}
+
+// accountPasswordRequiresReplace replaces a registered account when its password changes. Only an
+// imported account has no password in state, and moving the password unchanged to password_wo
+// keeps the account.
+func accountPasswordRequiresReplace(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	if req.StateValue.IsNull() {
+		return
+	}
+
+	if req.PlanValue.IsNull() {
+		var passwordWO types.String
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("password_wo"), &passwordWO)...)
+		if passwordWO.Equal(req.StateValue) {
+			return
+		}
+	}
+
+	resp.RequiresReplace = true
 }
 
 func (r *AccountRegister) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -122,11 +184,22 @@ func (r *AccountRegister) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// The write-only password is only in the configuration
+	password := data.Password.ValueString()
+	if data.Password.IsNull() {
+		var passwordWO types.String
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("password_wo"), &passwordWO)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		password = passwordWO.ValueString()
+	}
+
 	// New accounts use the default KDF settings
 	kdfConfig := models.DefaultKdfConfiguration()
 
 	// Build prelogin key
-	preloginKey, err := keybuilder.BuildPreloginKey(data.Password.ValueString(), data.Email.ValueString(), kdfConfig)
+	preloginKey, err := keybuilder.BuildPreloginKey(password, data.Email.ValueString(), kdfConfig)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error building prelogin key",
@@ -136,7 +209,7 @@ func (r *AccountRegister) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Hash password
-	hashedPw := crypt.HashPassword(data.Password.ValueString(), *preloginKey, false)
+	hashedPw := crypt.HashPassword(password, *preloginKey, false)
 
 	// Try to log in first - if successful, the user already exists
 	if _, err := r.client.LoginWithUserCredentials(ctx, hashedPw); err == nil {

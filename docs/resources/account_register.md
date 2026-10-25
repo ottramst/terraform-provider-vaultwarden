@@ -4,7 +4,7 @@ page_title: "vaultwarden_account_register Resource - vaultwarden"
 subcategory: ""
 description: |-
   This resource registers a new account on the Vaultwarden server.
-  This resource will save the password in plain text to the state! Use caution!
+  password is saved in plain text to the state. With Terraform 1.11 and later, use the write-only password_wo with password_wo_version instead, which are never stored.
   Requires admin_token to be set in the provider configuration.
 ---
 
@@ -12,21 +12,36 @@ description: |-
 
 This resource registers a new account on the Vaultwarden server.
 
-This resource will save the password in plain text to the state! Use caution!
+`password` is saved in plain text to the state. With Terraform 1.11 and later, use the write-only `password_wo` with `password_wo_version` instead, which are never stored.
 
 Requires `admin_token` to be set in the provider configuration.
 
 ## Example Usage
 
 ```terraform
-resource "random_password" "example" {
-  length = 32
+# Terraform 1.11 and later: the write-only password is never stored in the plan or state
+variable "account_password" {
+  type      = string
+  sensitive = true
+  ephemeral = true
 }
 
 resource "vaultwarden_account_register" "example" {
-  name     = "Example User"
-  email    = "foo@example.com"
-  password = random_password.example.result
+  name                = "Example User"
+  email               = "foo@example.com"
+  password_wo         = var.account_password
+  password_wo_version = 1 # Change to register the account again with the current password
+}
+
+# Older Terraform versions: the password is stored in plain text in the state
+resource "random_password" "legacy" {
+  length = 32
+}
+
+resource "vaultwarden_account_register" "legacy" {
+  name     = "Legacy User"
+  email    = "bar@example.com"
+  password = random_password.legacy.result
 }
 ```
 
@@ -36,11 +51,15 @@ resource "vaultwarden_account_register" "example" {
 ### Required
 
 - `email` (String) The email of the account to register. Changing it deletes the account, including its vault, and registers a new one.
-- `password` (String, Sensitive) The password of the account to register. Changing it deletes the account, including its vault, and registers a new one. The password cannot be read back, so it is not set after an import; setting it then only updates the state.
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `name` (String) The name of the account to register. Changing it deletes the account, including its vault, and registers a new one.
+- `password` (String, Sensitive) The password of the account to register. It is stored in plain text in the state: with Terraform 1.11 and later, use `password_wo` instead. Exactly one of `password` and `password_wo` must be set. Changing it deletes the account, including its vault, and registers a new one. The password cannot be read back, so it is not set after an import; setting it then only updates the state. Moving the same password to `password_wo` does not replace the account.
+- `password_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The password of the account to register, as a write-only attribute that is never stored in the plan or state. Requires Terraform 1.11 or later. Exactly one of `password` and `password_wo` must be set. Terraform cannot detect changes of a write-only value: change `password_wo_version` to register the account again with a new password.
+- `password_wo_version` (Number) Version of `password_wo`. Changing it deletes the account, including its vault, and registers a new one with the current `password_wo`. Setting it for the first time, for example after an import or when moving from `password` to `password_wo`, only updates the state.
 
 ### Read-Only
 
