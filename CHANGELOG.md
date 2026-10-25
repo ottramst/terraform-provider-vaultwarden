@@ -1,4 +1,4 @@
-## Unreleased
+## v0.5.1
 
 BUG FIXES:
 
