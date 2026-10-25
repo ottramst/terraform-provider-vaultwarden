@@ -143,6 +143,13 @@ func createTestAccount(ctx context.Context, t *testing.T) (*vaultwarden.Client, 
 
 	// Register user
 	if err := client.RegisterUser(ctx, signupReq); err != nil {
+		// go test runs the test binaries of several packages in parallel, so another one may
+		// have registered the user in the meantime. Vaultwarden then answers "Error saving
+		// user" (a unique constraint) rather than "user already exists".
+		if _, loginErr := client.LoginWithUserCredentials(ctx, hashedPw); loginErr == nil {
+			t.Log("User was registered concurrently")
+			return client, hashedPw, nil
+		}
 		if !isUserExistsError(err) {
 			t.Logf("Failed to register user: %v", err)
 			return nil, "", fmt.Errorf("failed to register user: %w", err)
