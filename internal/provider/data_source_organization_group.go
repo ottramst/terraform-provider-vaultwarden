@@ -1,0 +1,150 @@
+package provider
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden"
+	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
+)
+
+// Ensure provider defined types fully satisfy framework interfaces.
+var _ datasource.DataSource = &OrganizationGroupDataSource{}
+var _ datasource.DataSourceWithConfigure = &OrganizationGroupDataSource{}
+var _ datasource.DataSourceWithConfigValidators = &OrganizationGroupDataSource{}
+
+func NewOrganizationGroupDataSource() datasource.DataSource {
+	return &OrganizationGroupDataSource{}
+}
+
+// OrganizationGroupDataSource defines the data source implementation.
+type OrganizationGroupDataSource struct {
+	client *vaultwarden.Client
+}
+
+// OrganizationGroupDataSourceModel describes the data source data model.
+type OrganizationGroupDataSourceModel struct {
+	ID             types.String `tfsdk:"id"`
+	OrganizationID types.String `tfsdk:"organization_id"`
+	Name           types.String `tfsdk:"name"`
+	ExternalID     types.String `tfsdk:"external_id"`
+}
+
+func (d *OrganizationGroupDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_organization_group"
+}
+
+func (d *OrganizationGroupDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "This data source gets a group of a Vaultwarden organization by its ID or name.\n\n" +
+			"Groups require the `ORG_GROUPS_ENABLED=true` setting on the Vaultwarden server.",
+		Attributes: map[string]schema.Attribute{
+			"organization_id": schema.StringAttribute{
+				MarkdownDescription: "ID of the organization that the group belongs to",
+				Required:            true,
+			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "ID of the group. Exactly one of `id` and `name` must be set",
+				Optional:            true,
+				Computed:            true,
+			},
+			"name": schema.StringAttribute{
+				MarkdownDescription: "The name of the group to look up, compared exactly. Group names are not unique: " +
+					"when several groups have the name, the lookup fails and lists their IDs. Exactly one of `id` and `name` must be set",
+				Optional: true,
+				Computed: true,
+			},
+			"external_id": schema.StringAttribute{
+				MarkdownDescription: "The external ID of the group",
+				Computed:            true,
+			},
+		},
+	}
+}
+
+func (d *OrganizationGroupDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {
+	return []datasource.ConfigValidator{
+		datasourcevalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("name")),
+	}
+}
+
+func (d *OrganizationGroupDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if client := configureLookupClient(req, resp); client != nil {
+		d.client = client
+	}
+}
+
+func (d *OrganizationGroupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data OrganizationGroupDataSourceModel
+
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	orgID := data.OrganizationID.ValueString()
+	var group *models.Group
+	if !data.ID.IsNull() {
+		details, err := d.client.GetOrganizationGroup(ctx, orgID, data.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Organization Group",
+				fmt.Sprintf("Could not read group %s of organization %s: %s", data.ID.ValueString(), orgID, err),
+			)
+			return
+		}
+		group = &details.Group
+	} else {
+		groups, err := d.client.GetOrganizationGroups(ctx, orgID)
+		if err != nil {
+			addOrganizationListError(&resp.Diagnostics, orgID, "Groups", err)
+			return
+		}
+
+		name := data.Name.ValueString()
+		var matches []models.Group
+		for _, g := range groups {
+			if g.Name == name {
+				matches = append(matches, g)
+			}
+		}
+		switch len(matches) {
+		case 0:
+			resp.Diagnostics.AddError(
+				"Organization Group Not Found",
+				fmt.Sprintf("Organization %s has no group with name %q. Groups also require the ORG_GROUPS_ENABLED=true setting on the Vaultwarden server.", orgID, name),
+			)
+			return
+		case 1:
+			group = &matches[0]
+		default:
+			ids := make([]string, 0, len(matches))
+			for _, g := range matches {
+				ids = append(ids, g.ID)
+			}
+			sort.Strings(ids)
+			resp.Diagnostics.AddError(
+				"Multiple Organization Groups Found",
+				fmt.Sprintf("Organization %s has %d groups with name %q (IDs: %s). Look the group up by `id` instead.",
+					orgID, len(matches), name, strings.Join(ids, ", ")),
+			)
+			return
+		}
+	}
+
+	data.ID = types.StringValue(group.ID)
+	data.Name = types.StringValue(group.Name)
+	data.ExternalID = types.StringPointerValue(group.ExternalID)
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
