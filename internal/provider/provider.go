@@ -319,6 +319,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 		AccountRegisterResource,
 		OrganizationCollectionResource,
 		OrganizationCollectionUserResource,
+		OrganizationGroupResource,
 		OrganizationResource,
 		OrganizationUserResource,
 		UserResource,
@@ -328,6 +329,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewOrganizationDataSource,
+		NewOrganizationGroupDataSource,
 	}
 }
 
