@@ -1,0 +1,72 @@
+name: Bug report
+description: Something in the provider is not working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please check the
+        [support policy](https://github.com/ottramst/terraform-provider-vaultwarden#support-policy) first:
+        older Vaultwarden versions are supported on a best-effort basis only.
+  - type: input
+    id: provider-version
+    attributes:
+      label: Provider version
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: input
+    id: terraform-version
+    attributes:
+      label: Terraform version
+      description: Output of `terraform version`.
+      placeholder: "1.17.0"
+    validations:
+      required: true
+  - type: input
+    id: vaultwarden-version
+    attributes:
+      label: Vaultwarden version
+      description: The server version, as shown in the admin panel or by `GET /api/version`.
+      placeholder: "1.37.4"
+    validations:
+      required: true
+  - type: input
+    id: resources
+    attributes:
+      label: Affected resources or data sources
+      placeholder: vaultwarden_organization_user, vaultwarden_organization_collection
+  - type: textarea
+    id: config
+    attributes:
+      label: Terraform configuration
+      description: A minimal configuration that reproduces the problem. Remove any secrets.
+      render: hcl
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the full error output.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. terraform apply
+        2. ...
+  - type: textarea
+    id: debug
+    attributes:
+      label: Debug output
+      description: Optional. Run with `TF_LOG=DEBUG` and paste the relevant part, or link a gist. Remove any secrets.
+      render: shell

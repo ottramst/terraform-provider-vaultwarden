@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest a new resource, data source, attribute, or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What would you like the provider to do, and what problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Proposed configuration
+      description: Optional. How you would like to write it in Terraform.
+      render: hcl
+  - type: input
+    id: vaultwarden-version
+    attributes:
+      label: Vaultwarden version
+      description: The Vaultwarden version that provides the underlying feature, if known.
+      placeholder: "1.37.4"
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Optional. Links to Vaultwarden or Bitwarden documentation, API endpoints, or related issues.

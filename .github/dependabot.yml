@@ -1,17 +1,49 @@
 # See GitHub's documentation for more information on this file:
-# https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/configuration-options-for-dependency-updates
-
+# https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+#
+# Vaultwarden itself is not updated here: the acceptance test matrix in
+# .github/workflows/test.yml and the VW_VERSION default in docker-compose.yml
+# are bumped together by hand (see CONTRIBUTING.md). It is the only image in
+# docker-compose.yml, so that ecosystem is not configured.
 version: 2
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    groups:
+      # Group all terraform-plugin-(go|framework|testing|...) dependencies together
+      "terraform-plugin":
+        patterns:
+          - "github.com/hashicorp/terraform-plugin-*"
+      "go-minor-patch":
+        update-types:
+          - "minor"
+          - "patch"
   - package-ecosystem: "gomod"
     directory: "/tools"
     schedule:
       interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    groups:
+      "tools":
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
+    groups:
+      "github-actions":
+        patterns:
+          - "*" # Group all GitHub Actions dependencies together

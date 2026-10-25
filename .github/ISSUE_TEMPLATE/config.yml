@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and usage help
+    url: https://github.com/ottramst/terraform-provider-vaultwarden/discussions
+    about: Ask questions and discuss ideas in GitHub Discussions.
+  - name: Security vulnerability
+    url: https://github.com/ottramst/terraform-provider-vaultwarden/security/advisories/new
+    about: Report security vulnerabilities privately.
+  - name: Vaultwarden issues
+    url: https://github.com/dani-garcia/vaultwarden/issues
+    about: Problems with Vaultwarden itself, rather than this provider.
