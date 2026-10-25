@@ -29,7 +29,7 @@ resource "vaultwarden_organization_user" "example" {
 
 ### Required
 
-- `email` (String) The email of the user to invite
+- `email` (String) The email of the user to invite. Changing it removes the user from the organization and invites the new email.
 - `organization_id` (String) ID of the organization to invite the user to
 
 ### Optional

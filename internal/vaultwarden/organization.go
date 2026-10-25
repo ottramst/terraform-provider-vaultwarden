@@ -35,7 +35,7 @@ func (c *Client) CreateOrganization(ctx context.Context, org models.Organization
 	// Create the public and private keys
 	publicKey, encryptedPrivateKey, err := keybuilder.GenerateEncryptedRSAKeyPair(*sharedKey)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to generate organization key pair: %w", err)
 	}
 
 	// Add the keys to the organization
@@ -81,6 +81,9 @@ func (c *Client) GetOrganization(ctx context.Context, ID string) (*models.Organi
 
 	var org models.Organization
 	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s", ID), nil, &org); err != nil {
+		if c.organizationGone(ctx, ID, err) {
+			return nil, fmt.Errorf("organization %s: %w", ID, ErrNotFound)
+		}
 		return nil, fmt.Errorf("failed to get organization: %w", err)
 	}
 
@@ -139,6 +142,10 @@ func (c *Client) DeleteOrganization(ctx context.Context, ID string) error {
 	}
 
 	if _, err := c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/organizations/%s", ID), body, nil); err != nil {
+		// Already deleted
+		if c.organizationGone(ctx, ID, err) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete organization: %w", err)
 	}
 
@@ -157,10 +164,13 @@ type InviteOrganizationUserRequest struct {
 }
 
 // UpdateOrganizationUserRequest represents the request body for updating a user in an organization.
+// Vaultwarden replaces the user's collection and group assignments with the ones sent.
 type UpdateOrganizationUserRequest struct {
-	Type        models.UserOrgType `json:"type"`
-	AccessAll   bool               `json:"accessAll"`
-	Permissions map[string]bool    `json:"permissions,omitempty"`
+	Type        models.UserOrgType        `json:"type"`
+	AccessAll   bool                      `json:"accessAll"`
+	Permissions map[string]bool           `json:"permissions,omitempty"`
+	Collections []models.CollectionAccess `json:"collections"`
+	Groups      []string                  `json:"groups"`
 }
 
 // OrganizationUserRole returns the type and permissions to send for a role. Vaultwarden 1.34+
@@ -224,10 +234,16 @@ func (c *Client) GetOrganizationUserByEmail(ctx context.Context, email, orgID st
 	return nil, fmt.Errorf("user not found in organization")
 }
 
-// GetOrganizationUser retrieves a user in an organization by their ID.
+// GetOrganizationUser retrieves a user in an organization by their ID, including the
+// collections and groups assigned to them directly.
 func (c *Client) GetOrganizationUser(ctx context.Context, userID, orgID string) (*models.OrganizationUserDetails, error) {
 	var user models.OrganizationUserDetails
-	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), nil, &user); err != nil {
+	path := fmt.Sprintf("/api/organizations/%s/users/%s?includeCollections=true&includeGroups=true", orgID, userID)
+	if _, err := c.doRequest(ctx, http.MethodGet, path, nil, &user); err != nil {
+		// Vaultwarden answers 400 for a member that is not part of the organization
+		if hasStatus(err, http.StatusBadRequest) || c.organizationGone(ctx, orgID, err) {
+			return nil, fmt.Errorf("organization user %s: %w", userID, ErrNotFound)
+		}
 		return nil, fmt.Errorf("failed to get organization user: %w", err)
 	}
 
@@ -237,14 +253,63 @@ func (c *Client) GetOrganizationUser(ctx context.Context, userID, orgID string) 
 // DeleteOrganizationUser deletes a user in an organization by their ID.
 func (c *Client) DeleteOrganizationUser(ctx context.Context, userID, orgID string) error {
 	if _, err := c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), nil, nil); err != nil {
+		// Already removed
+		if _, getErr := c.GetOrganizationUser(ctx, userID, orgID); IsNotFound(getErr) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete organization user: %w", err)
 	}
 
 	return nil
 }
 
-// UpdateOrganizationUser updates a user in an organization by their ID.
+// organizationCollectionsAccess is the response of the organization collection details endpoint.
+type organizationCollectionsAccess struct {
+	Data []struct {
+		ID    string                    `json:"id"`
+		Users []models.CollectionAccess `json:"users"`
+	} `json:"data"`
+}
+
+// getOrganizationUserCollectionAccess returns the collections a user is assigned to directly.
+// The user details endpoint only lists them for confirmed users before Vaultwarden 1.37, so they
+// are collected from the organization's collection details instead.
+func (c *Client) getOrganizationUserCollectionAccess(ctx context.Context, orgID, userID string) ([]models.CollectionAccess, error) {
+	var details organizationCollectionsAccess
+	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/collections/details", orgID), nil, &details); err != nil {
+		return nil, fmt.Errorf("failed to get organization collection access: %w", err)
+	}
+
+	collections := []models.CollectionAccess{}
+	for _, collection := range details.Data {
+		for _, user := range collection.Users {
+			if user.ID == userID {
+				user.ID = collection.ID
+				collections = append(collections, user)
+			}
+		}
+	}
+
+	return collections, nil
+}
+
+// UpdateOrganizationUser updates the type of a user in an organization by their ID. The user's
+// existing collection and group assignments are preserved.
 func (c *Client) UpdateOrganizationUser(ctx context.Context, userID, orgID string, req UpdateOrganizationUserRequest) error {
+	current, err := c.GetOrganizationUser(ctx, userID, orgID)
+	if err != nil {
+		return err
+	}
+
+	req.Collections, err = c.getOrganizationUserCollectionAccess(ctx, orgID, userID)
+	if err != nil {
+		return err
+	}
+	req.Groups = current.Groups
+	if req.Groups == nil {
+		req.Groups = []string{}
+	}
+
 	if _, err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/organizations/%s/users/%s", orgID, userID), req, nil); err != nil {
 		return fmt.Errorf("failed to update organization user: %w", err)
 	}

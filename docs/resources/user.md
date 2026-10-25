@@ -26,7 +26,7 @@ resource "vaultwarden_user" "example" {
 
 ### Required
 
-- `email` (String) The email of the user to invite
+- `email` (String) The email of the user to invite. Changing it deletes the user, including their vault if they accepted the invitation, and invites the new email.
 
 ### Read-Only
 

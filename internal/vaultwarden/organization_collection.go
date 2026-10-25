@@ -30,11 +30,11 @@ func (c *Client) CreateOrganizationCollection(ctx context.Context, orgID string,
 
 	// Set empty lists for groups and users when none are provided
 	if collection.Groups == nil {
-		collection.Groups = []string{}
+		collection.Groups = []models.CollectionAccess{}
 	}
 
 	if collection.Users == nil {
-		collection.Users = []string{}
+		collection.Users = []models.CollectionAccess{}
 	}
 
 	var collectionResp models.Collection
@@ -55,6 +55,9 @@ func (c *Client) GetOrganizationCollection(ctx context.Context, orgID string, co
 		nil,
 		&listResp,
 	); err != nil {
+		if c.organizationGone(ctx, orgID, err) {
+			return nil, fmt.Errorf("organization %s: %w", orgID, ErrNotFound)
+		}
 		return nil, fmt.Errorf("failed to list organization collections: %w", err)
 	}
 
@@ -65,7 +68,45 @@ func (c *Client) GetOrganizationCollection(ctx context.Context, orgID string, co
 		}
 	}
 
-	return nil, fmt.Errorf("collection %s not found in organization %s", collectionID, orgID)
+	return nil, fmt.Errorf("collection %s in organization %s: %w", collectionID, orgID, ErrNotFound)
+}
+
+// GetOrganizationCollectionAccess returns the users and groups assigned to a collection.
+func (c *Client) GetOrganizationCollectionAccess(ctx context.Context, orgID, colID string) (*models.CollectionAccessDetails, error) {
+	var details models.CollectionAccessDetails
+	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/organizations/%s/collections/%s/details", orgID, colID), nil, &details); err != nil {
+		return nil, fmt.Errorf("failed to get organization collection access: %w", err)
+	}
+
+	return &details, nil
+}
+
+// bulkCollectionAccessRequest is the request body for setting the access to collections.
+type bulkCollectionAccessRequest struct {
+	CollectionIDs []string                  `json:"collectionIds"`
+	Users         []models.CollectionAccess `json:"users"`
+	Groups        []models.CollectionAccess `json:"groups"`
+}
+
+// SetOrganizationCollectionAccess replaces the users and groups assigned to a collection.
+func (c *Client) SetOrganizationCollectionAccess(ctx context.Context, orgID, colID string, access models.CollectionAccessDetails) error {
+	req := bulkCollectionAccessRequest{
+		CollectionIDs: []string{colID},
+		Users:         access.Users,
+		Groups:        access.Groups,
+	}
+	if req.Users == nil {
+		req.Users = []models.CollectionAccess{}
+	}
+	if req.Groups == nil {
+		req.Groups = []models.CollectionAccess{}
+	}
+
+	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/organizations/%s/collections/bulk-access", orgID), req, nil); err != nil {
+		return fmt.Errorf("failed to set organization collection access: %w", err)
+	}
+
+	return nil
 }
 
 // UpdateOrganizationCollection updates an existing Vaultwarden organization collection.
@@ -88,13 +129,19 @@ func (c *Client) UpdateOrganizationCollection(ctx context.Context, orgID, colID 
 	}
 	collection.Name = collectionName
 
-	// Set empty lists for groups and users when none are provided
-	if collection.Groups == nil {
-		collection.Groups = []string{}
+	// Vaultwarden replaces the collection's user and group assignments with the ones
+	// sent, so send back the current ones
+	access, err := c.GetOrganizationCollectionAccess(ctx, orgID, colID)
+	if err != nil {
+		return nil, err
 	}
-
+	collection.Users = access.Users
 	if collection.Users == nil {
-		collection.Users = []string{}
+		collection.Users = []models.CollectionAccess{}
+	}
+	collection.Groups = access.Groups
+	if collection.Groups == nil {
+		collection.Groups = []models.CollectionAccess{}
 	}
 
 	var collectionResp models.Collection
@@ -105,8 +152,13 @@ func (c *Client) UpdateOrganizationCollection(ctx context.Context, orgID, colID 
 	return &collectionResp, nil
 }
 
+// DeleteOrganizationCollection deletes a collection from an organization.
 func (c *Client) DeleteOrganizationCollection(ctx context.Context, orgID, colID string) error {
 	if _, err := c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/organizations/%s/collections/%s", orgID, colID), nil, nil); err != nil {
+		// Already deleted
+		if _, getErr := c.GetOrganizationCollection(ctx, orgID, colID); IsNotFound(getErr) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete organization collection: %w", err)
 	}
 

@@ -2,10 +2,12 @@ package vaultwarden
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"net/http"
 	"net/mail"
+	"strings"
 )
 
 // RegisterUserRequest represents the request body for registering a user.
@@ -82,6 +84,9 @@ func (c *Client) GetUser(ctx context.Context, ID string) (*models.User, error) {
 
 	var user models.User
 	if _, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/admin/users/%s", ID), nil, &user); err != nil {
+		if isUserNotFound(err) {
+			return nil, fmt.Errorf("user %s: %w", ID, ErrNotFound)
+		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
@@ -95,10 +100,21 @@ func (c *Client) DeleteUser(ctx context.Context, ID string) error {
 	}
 
 	if _, err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/admin/users/%s/delete", ID), struct{}{}, nil); err != nil {
+		// Already deleted
+		if isUserNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
 	return nil
+}
+
+// isUserNotFound reports whether err is the admin API's answer for a user that does not exist.
+// An unknown route is also a 404, but with an HTML page instead of a JSON error.
+func isUserNotFound(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound && strings.Contains(apiErr.Body, "User doesn't exist")
 }
 
 // GetUserByEmail retrieves a user by their email address.

@@ -166,6 +166,11 @@ func (r *OrganizationCollection) Read(ctx context.Context, req resource.ReadRequ
 	// Get refreshed data from the client
 	collResp, err := r.client.GetOrganizationCollection(ctx, data.OrganizationID.ValueString(), data.ID.ValueString())
 	if err != nil {
+		// Deleted outside Terraform
+		if vaultwarden.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading Vaultwarden organization collection",
 			"Could not read organization collection, unexpected error: "+err.Error(),
