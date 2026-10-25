@@ -6,6 +6,7 @@ ENHANCEMENTS:
 * resource/vaultwarden_organization_user: New `auto_confirm` attribute. When `true`, a user that accepted the invitation is confirmed by encrypting the organization key with their public key, so that they can decrypt the organization's items. While the user is still invited nothing changes; once they accepted, the next plan shows `status` changing and the apply confirms them ([#53](https://github.com/ottramst/terraform-provider-vaultwarden/issues/53))
 * resource/vaultwarden_organization_user: New `revoked` attribute to revoke a user's access to the organization and restore it. A restored user gets back the status they had before ([#53](https://github.com/ottramst/terraform-provider-vaultwarden/issues/53))
 * resource/vaultwarden_organization_user: Updates that only change `auto_confirm` or `revoked` no longer send the user's role again
+* resource/vaultwarden_user: New `enabled` attribute to disable and enable a user. Disabling a user also logs them out of all their devices. A user disabled or enabled outside Terraform is set back on the next apply ([#56](https://github.com/ottramst/terraform-provider-vaultwarden/issues/56))
 
 FEATURES:
 
@@ -17,10 +18,6 @@ FEATURES:
 * **New Data Source:** `vaultwarden_organizations` - List the organizations the provider user is a confirmed member of ([#54](https://github.com/ottramst/terraform-provider-vaultwarden/issues/54))
 * **New Data Source:** `vaultwarden_user` - Look up a user of the server by email or ID with the admin API, including whether they are enabled, invited and have two-step login, and their organizations ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
 * **New Data Source:** `vaultwarden_users` - List all users of the server with the admin API, including when they were last active ([#55](https://github.com/ottramst/terraform-provider-vaultwarden/issues/55))
-
-ENHANCEMENTS:
-
-* resource/vaultwarden_user: New `enabled` attribute to disable and enable a user. Disabling a user also logs them out of all their devices. A user disabled or enabled outside Terraform is set back on the next apply ([#56](https://github.com/ottramst/terraform-provider-vaultwarden/issues/56))
 
 ## v0.5.1
 
