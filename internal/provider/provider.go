@@ -380,6 +380,7 @@ func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasour
 		NewOrganizationsDataSource,
 		NewOrganizationCollectionDataSource,
 		NewOrganizationCollectionsDataSource,
+		NewOrganizationEventsDataSource,
 		NewOrganizationGroupDataSource,
 		NewOrganizationUserDataSource,
 		NewOrganizationUsersDataSource,
