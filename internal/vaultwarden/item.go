@@ -25,22 +25,23 @@ const maxPasswordHistory = 5
 // provider does not manage, such as the password history and the passkeys of a login, are kept
 // as they are on updates.
 type cipher struct {
-	ID              string          `json:"id"`
-	Type            models.ItemType `json:"type"`
-	OrganizationID  *string         `json:"organizationId"`
-	FolderID        *string         `json:"folderId"`
-	CollectionIDs   []string        `json:"collectionIds"`
-	Key             *string         `json:"key"`
-	Name            string          `json:"name"`
-	Notes           *string         `json:"notes"`
-	Favorite        bool            `json:"favorite"`
-	Reprompt        int             `json:"reprompt"`
-	Fields          []cipherField   `json:"fields"`
-	Login           json.RawMessage `json:"login"`
-	PasswordHistory json.RawMessage `json:"passwordHistory"`
-	ArchivedDate    *string         `json:"archivedDate"`
-	DeletedDate     *string         `json:"deletedDate"`
-	RevisionDate    string          `json:"revisionDate"`
+	ID              string             `json:"id"`
+	Type            models.ItemType    `json:"type"`
+	OrganizationID  *string            `json:"organizationId"`
+	FolderID        *string            `json:"folderId"`
+	CollectionIDs   []string           `json:"collectionIds"`
+	Key             *string            `json:"key"`
+	Name            string             `json:"name"`
+	Notes           *string            `json:"notes"`
+	Favorite        bool               `json:"favorite"`
+	Reprompt        int                `json:"reprompt"`
+	Fields          []cipherField      `json:"fields"`
+	Login           json.RawMessage    `json:"login"`
+	PasswordHistory json.RawMessage    `json:"passwordHistory"`
+	Attachments     []cipherAttachment `json:"attachments"`
+	ArchivedDate    *string            `json:"archivedDate"`
+	DeletedDate     *string            `json:"deletedDate"`
+	RevisionDate    string             `json:"revisionDate"`
 }
 
 // cipherField is a custom field of a cipher.
@@ -118,19 +119,20 @@ func itemKey(encryptedKey *string, ownerKey symmetrickey.Key) (symmetrickey.Key,
 	return *key, nil
 }
 
-// newItemKey generates an item key and returns it with its encryption with the owner key.
-func newItemKey(ownerKey symmetrickey.Key) (symmetrickey.Key, string, error) {
+// newObjectKey generates the key of an item or an attachment, and returns it with its
+// encryption with parentKey: the owner key for an item, the item key for an attachment.
+func newObjectKey(parentKey symmetrickey.Key) (symmetrickey.Key, string, error) {
 	raw := make([]byte, 64)
 	if _, err := rand.Read(raw); err != nil {
-		return symmetrickey.Key{}, "", fmt.Errorf("failed to generate an item key: %w", err)
+		return symmetrickey.Key{}, "", fmt.Errorf("failed to generate a key: %w", err)
 	}
 	key, err := symmetrickey.NewFromRawBytes(raw)
 	if err != nil {
 		return symmetrickey.Key{}, "", err
 	}
-	encrypted, err := crypt.EncryptAsString(raw, ownerKey)
+	encrypted, err := crypt.EncryptAsString(raw, parentKey)
 	if err != nil {
-		return symmetrickey.Key{}, "", fmt.Errorf("failed to encrypt the item key: %w", err)
+		return symmetrickey.Key{}, "", fmt.Errorf("failed to encrypt the key: %w", err)
 	}
 	return *key, encrypted, nil
 }
@@ -300,6 +302,23 @@ func (c *Client) decryptCipher(ctx context.Context, encrypted *cipher) (*models.
 		}
 	}
 
+	for _, attachment := range encrypted.Attachments {
+		fileName, err := decrypt("attachment file name", attachment.FileName)
+		if err != nil {
+			return nil, err
+		}
+		size, err := attachment.Size.Int64()
+		if err != nil {
+			return nil, fmt.Errorf("invalid size of attachment %s of item %s: %w", attachment.ID, encrypted.ID, err)
+		}
+		item.Attachments = append(item.Attachments, models.ItemAttachment{
+			ID:       attachment.ID,
+			FileName: fileName,
+			Size:     size,
+			SizeName: attachment.SizeName,
+		})
+	}
+
 	return item, nil
 }
 
@@ -459,7 +478,7 @@ func (c *Client) CreateItem(ctx context.Context, item models.Item) (*models.Item
 	if err != nil {
 		return nil, err
 	}
-	key, encryptedKey, err := newItemKey(ownerKey)
+	key, encryptedKey, err := newObjectKey(ownerKey)
 	if err != nil {
 		return nil, err
 	}

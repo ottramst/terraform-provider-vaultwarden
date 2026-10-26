@@ -49,6 +49,7 @@ type Item struct {
 	Login    *ItemLogin
 	// PasswordHistory are the previous passwords of a login, newest first
 	PasswordHistory []ItemPasswordHistory
+	Attachments     []ItemAttachment
 	RevisionDate    string
 	// HasKey reports whether the item's fields are encrypted with an item key (cipher key)
 	HasKey bool
@@ -80,4 +81,14 @@ type ItemLoginURI struct {
 type ItemPasswordHistory struct {
 	Password     string
 	LastUsedDate string
+}
+
+// ItemAttachment is a file attached to an item.
+type ItemAttachment struct {
+	ID       string
+	FileName string
+	// Size is the size of the encrypted file in bytes
+	Size int64
+	// SizeName is the size in a human-readable form, such as "1.2 KB"
+	SizeName string
 }
