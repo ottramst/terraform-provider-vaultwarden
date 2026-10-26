@@ -355,6 +355,7 @@ func (p *VaultwardenProvider) Resources(ctx context.Context) []func() resource.R
 	return []func() resource.Resource{
 		AccountRegisterResource,
 		FolderResource,
+		ItemAttachmentResource,
 		ItemLoginResource,
 		ItemSecureNoteResource,
 		OrganizationAPIKeyRotationResource,
@@ -389,6 +390,7 @@ func (p *VaultwardenProvider) DataSources(ctx context.Context) []func() datasour
 
 func (p *VaultwardenProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
 	return []func() ephemeral.EphemeralResource{
+		NewItemAttachmentEphemeralResource,
 		NewItemLoginEphemeralResource,
 		NewItemSecureNoteEphemeralResource,
 		NewOrganizationAPIKeyEphemeralResource,

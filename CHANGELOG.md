@@ -1,3 +1,10 @@
+## Unreleased
+
+FEATURES:
+
+* **New Resource:** `vaultwarden_item_attachment` - Attach a file to an item, from a `file`, a UTF-8 `content` or a binary `content_base64` ([#62](https://github.com/ottramst/terraform-provider-vaultwarden/issues/62)). Files are encrypted like Bitwarden clients do, with their own attachment key. A changed file (detected with `content_sha256`) or file name replaces the attachment. Imports with `<item_id>/<attachment_id>`
+* **New Ephemeral Resource:** `vaultwarden_item_attachment` - Download and decrypt an attachment without saving its content in the plan or state (Terraform 1.10 and later) ([#62](https://github.com/ottramst/terraform-provider-vaultwarden/issues/62))
+
 ## v0.7.0
 
 FEATURES:

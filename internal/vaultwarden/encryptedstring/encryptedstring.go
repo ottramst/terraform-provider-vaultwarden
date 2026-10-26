@@ -123,3 +123,45 @@ func (encString *EncryptedString) String() string {
 
 	return encryptedString
 }
+
+// NewFromEncryptedBuffer parses an encrypted buffer (EncArrayBuffer), the binary form of an
+// encrypted value that Bitwarden clients use for attachment files: the encryption type, the IV,
+// the MAC and the data. Only AesCbc256_HmacSha256_B64 is supported.
+func NewFromEncryptedBuffer(buffer []byte) (*EncryptedString, error) {
+	if len(buffer) == 0 {
+		return nil, fmt.Errorf("the provided encrypted buffer is empty")
+	}
+	encType := symmetrickey.EncryptionType(buffer[0])
+	if encType != symmetrickey.AesCbc256_HmacSha256_B64 {
+		return nil, fmt.Errorf("unsupported encryption type of encrypted buffer: %d", encType)
+	}
+	headerLength := BUFFER_ENC_TYPE_LENGTH + BUFFER_IV_LENGTH + BUFFER_MAC_LENGTH
+	if len(buffer) < headerLength+BUFFER_MIN_DATA_LENGTH {
+		return nil, fmt.Errorf("encrypted buffer is too short: %d bytes", len(buffer))
+	}
+
+	encString := EncryptedString{
+		IV:   buffer[BUFFER_ENC_TYPE_LENGTH : BUFFER_ENC_TYPE_LENGTH+BUFFER_IV_LENGTH],
+		Hmac: buffer[BUFFER_ENC_TYPE_LENGTH+BUFFER_IV_LENGTH : headerLength],
+		Data: buffer[headerLength:],
+	}
+	encString.Key.EncryptionType = encType
+	return &encString, nil
+}
+
+// Buffer returns the encrypted value as an encrypted buffer (EncArrayBuffer), see
+// NewFromEncryptedBuffer.
+func (encString *EncryptedString) Buffer() ([]byte, error) {
+	if encString.Key.EncryptionType != symmetrickey.AesCbc256_HmacSha256_B64 {
+		return nil, fmt.Errorf("unsupported encryption type of encrypted buffer: %d", encString.Key.EncryptionType)
+	}
+	if len(encString.IV) != BUFFER_IV_LENGTH || len(encString.Hmac) != BUFFER_MAC_LENGTH {
+		return nil, fmt.Errorf("invalid IV or MAC length: %d, %d", len(encString.IV), len(encString.Hmac))
+	}
+	buffer := make([]byte, 0, BUFFER_ENC_TYPE_LENGTH+BUFFER_IV_LENGTH+BUFFER_MAC_LENGTH+len(encString.Data))
+	buffer = append(buffer, byte(encString.Key.EncryptionType))
+	buffer = append(buffer, encString.IV...)
+	buffer = append(buffer, encString.Hmac...)
+	buffer = append(buffer, encString.Data...)
+	return buffer, nil
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/ottramst/terraform-provider-vaultwarden/internal/vaultwarden/models"
 	"io"
 	"math/rand/v2"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -118,12 +119,25 @@ func New(endpoint string, opts ...ClientOption) (*Client, error) {
 	return client, nil
 }
 
-// requestURL returns the URL for path, which may include a query string.
-func (c *Client) requestURL(path string) *url.URL {
+// requestURL returns the URL for path, which may include a query string. An absolute URL, such
+// as the download URL of an attachment in external storage, is used as it is.
+func (c *Client) requestURL(path string) (*url.URL, error) {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return url.Parse(path)
+	}
 	path, query, _ := strings.Cut(path, "?")
 	reqURL := c.endpoint.JoinPath(path)
 	reqURL.RawQuery = query
-	return reqURL
+	return reqURL, nil
+}
+
+// multipartFile is a request body of a multipart form with a single file.
+type multipartFile struct {
+	// field is the name of the form field
+	field string
+	// fileName is the file name sent with the file
+	fileName string
+	data     []byte
 }
 
 // prepareRequestBody prepares the request body and returns the appropriate content type.
@@ -146,6 +160,22 @@ func prepareRequestBody(reqBody interface{}) (io.Reader, string, error) {
 	case []byte:
 		// Handle raw byte data
 		bodyReader = bytes.NewReader(v)
+	case multipartFile:
+		// Handle a multipart form with a file
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+		part, err := writer.CreateFormFile(v.field, v.fileName)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to create multipart form: %w", err)
+		}
+		if _, err := part.Write(v.data); err != nil {
+			return nil, "", fmt.Errorf("failed to write multipart form: %w", err)
+		}
+		if err := writer.Close(); err != nil {
+			return nil, "", fmt.Errorf("failed to write multipart form: %w", err)
+		}
+		bodyReader = &buf
+		contentType = writer.FormDataContentType()
 	default:
 		// Handle JSON data
 		jsonData, err := json.Marshal(reqBody)
@@ -187,7 +217,8 @@ const DefaultMaxRetryWait = time.Minute
 // maxRetryDelay caps the wait between two retries.
 const maxRetryDelay = 30 * time.Second
 
-// send performs a request and decodes a JSON response into respBody, if set. Rate limited
+// send performs a request and decodes a JSON response into respBody, if set, or copies the
+// response body into it when respBody is a *[]byte. Rate limited
 // requests (HTTP 429) are retried with exponential backoff for up to maxRetryWait in total.
 // Vaultwarden sends no Retry-After header, so the wait is not taken from the response.
 func (c *Client) send(ctx context.Context, method, path string, reqBody, respBody interface{}, opts requestOptions) (*http.Response, error) {
@@ -242,7 +273,10 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, reqBody, res
 	}
 
 	// Create request with context
-	reqURL := c.requestURL(path)
+	reqURL, err := c.requestURL(path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request URL: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, method, reqURL.String(), bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -252,7 +286,9 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, reqBody, res
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	req.Header.Set("Accept", "application/json")
+	if _, raw := respBody.(*[]byte); !raw {
+		req.Header.Set("Accept", "application/json")
+	}
 
 	// Add authentication to request
 	if opts.authorize != nil {
@@ -290,8 +326,10 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, reqBody, res
 		return resp, &APIError{StatusCode: resp.StatusCode, Status: resp.Status, Body: string(body)}
 	}
 
-	// Parse successful response if a response struct is provided
-	if respBody != nil && len(body) > 0 {
+	// Return the raw body, or parse it if a response struct is provided
+	if raw, ok := respBody.(*[]byte); ok {
+		*raw = body
+	} else if respBody != nil && len(body) > 0 {
 		if err := json.Unmarshal(body, respBody); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}

@@ -140,3 +140,63 @@ func TestSendDoesNotRetryOtherErrors(t *testing.T) {
 		t.Errorf("server got %d requests, want 1", got)
 	}
 }
+
+func TestSendMultipartAndRawResponse(t *testing.T) {
+	var contentType, fileName string
+	var data []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/upload":
+			contentType = r.Header.Get("Content-Type")
+			file, header, err := r.FormFile("data")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			fileName = header.Filename
+			data, _ = io.ReadAll(file)
+		case "/attachments/item/file":
+			if r.URL.Query().Get("token") != "abc" {
+				http.Error(w, "bad token", http.StatusUnauthorized)
+				return
+			}
+			_, _ = w.Write([]byte{0, 1, 2, 255})
+		}
+	}))
+	t.Cleanup(server.Close)
+	client := newTestClient(t, server.URL, time.Minute)
+	ctx := context.Background()
+
+	if _, err := client.doUnauthenticatedRequest(ctx, http.MethodPost, "/upload", multipartFile{field: "data", fileName: "2.enc", data: []byte{9, 8, 7}}, nil); err != nil {
+		t.Fatalf("upload failed: %v", err)
+	}
+	if !strings.HasPrefix(contentType, "multipart/form-data; boundary=") || fileName != "2.enc" || string(data) != string([]byte{9, 8, 7}) {
+		t.Errorf("unexpected upload: content type %q, file name %q, data %v", contentType, fileName, data)
+	}
+
+	// Relative and absolute URLs return the raw body
+	for _, path := range []string{"/attachments/item/file?token=abc", server.URL + "/attachments/item/file?token=abc"} {
+		var body []byte
+		if _, err := client.doUnauthenticatedRequest(ctx, http.MethodGet, path, nil, &body); err != nil {
+			t.Fatalf("download from %s failed: %v", path, err)
+		}
+		if string(body) != string([]byte{0, 1, 2, 255}) {
+			t.Errorf("download from %s returned %v", path, body)
+		}
+	}
+}
+
+func TestAttachmentDownloadPath(t *testing.T) {
+	for downloadURL, want := range map[string]string{
+		// Vaultwarden's own storage, behind another DOMAIN or under a path
+		"http://localhost/attachments/item/file?token=abc":         "/attachments/item/file?token=abc",
+		"https://vw.example.com/vw/attachments/item/file?token=ab": "/attachments/item/file?token=ab",
+		// Object storage
+		"https://bucket.s3.example.com/item/file?X-Amz-Signature=1": "https://bucket.s3.example.com/item/file?X-Amz-Signature=1",
+		"https://bucket.s3.example.com/attachments/other/file":      "https://bucket.s3.example.com/attachments/other/file",
+	} {
+		if got := attachmentDownloadPath(downloadURL, "item"); got != want {
+			t.Errorf("attachmentDownloadPath(%q) = %q, want %q", downloadURL, got, want)
+		}
+	}
+}
